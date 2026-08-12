@@ -74,6 +74,7 @@
                     <button onclick="switchTab('dictionary')" class="tab-btn px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors">Sözlük</button>
                     <button onclick="switchTab('stats')" class="tab-btn px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors">İstatistik</button>
                     <button onclick="openCloudModal()" class="tab-btn px-3 py-2 rounded-lg text-sm font-bold text-sky-600 bg-sky-50 hover:bg-sky-100 dark:text-sky-300 dark:bg-sky-900/40 dark:hover:bg-sky-800 transition-colors shadow-sm border border-sky-200 dark:border-sky-800">☁️ Bulut</button>
+                    <button onclick="openApiModal()" class="tab-btn px-3 py-2 rounded-lg text-sm font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 dark:text-amber-300 dark:bg-amber-900/40 dark:hover:bg-amber-800 transition-colors shadow-sm border border-amber-200 dark:border-amber-800">🔑 API</button>
                 </div>
             </div>
         </div>
@@ -91,6 +92,22 @@
                 <div class="flex gap-2">
                     <button onclick="document.getElementById('cloudModal').classList.add('hidden')" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 text-slate-700 font-bold rounded-xl transition">Kapat</button>
                     <button onclick="startCloudSync()" class="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white font-bold rounded-xl transition shadow-lg">Bağlan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Anahtarı Modalı -->
+    <div id="apiModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl transform transition-all">
+            <h3 class="text-2xl font-bold text-slate-800 dark:text-white mb-2 flex items-center gap-2">🔑 API Ayarları</h3>
+            <p class="text-slate-600 dark:text-slate-300 mb-4 text-sm">GitHub, kodun içine yazılan API şifrelerini güvenlik nedeniyle otomatik olarak iptal eder. Bu yüzden şifrenizi buraya girin. Sadece bu tarayıcıda gizli kalacaktır.</p>
+            <input type="text" id="api-key-input" placeholder="Google Gemini API Key..." class="w-full px-4 py-3 border-2 border-amber-200 dark:border-amber-800 dark:bg-slate-700 dark:text-white rounded-xl mb-4 outline-none focus:border-amber-500">
+            <div class="flex justify-between items-center">
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-xs font-bold text-indigo-500 hover:underline">Yeni Şifre Al</a>
+                <div class="flex gap-2">
+                    <button onclick="document.getElementById('apiModal').classList.add('hidden')" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 text-slate-700 font-bold rounded-xl transition">Kapat</button>
+                    <button onclick="saveApiKey()" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition shadow-lg">Kaydet</button>
                 </div>
             </div>
         </div>
@@ -468,10 +485,35 @@
     </script>
 
     <script>
-        // API KEY YÖNETİMİ
-        let GEMINI_API_KEY = 'AQ.Ab8RN6LtUyt2lt87-0gTCtiC41Yo_aJi1RX4qRYdAiV-kJKDvw'; 
-        localStorage.setItem('gemini_api_key', GEMINI_API_KEY);
+        // API KEY YÖNETİMİ - Artık güvenlik için Local Storage'dan çekiliyor!
+        let GEMINI_API_KEY = localStorage.getItem('gemini_api_key') || '';
         
+        window.openApiModal = function() {
+            document.getElementById('apiModal').classList.remove('hidden');
+            document.getElementById('api-key-input').value = GEMINI_API_KEY;
+        }
+
+        window.saveApiKey = function() {
+            const key = document.getElementById('api-key-input').value.trim();
+            if(key) {
+                localStorage.setItem('gemini_api_key', key);
+                GEMINI_API_KEY = key;
+                document.getElementById('apiModal').classList.add('hidden');
+                showToast("API Şifresi tarayıcıya kaydedildi!");
+            } else {
+                showToast("Şifre boş olamaz!", "error");
+            }
+        }
+
+        function checkApiKey() {
+            if (!GEMINI_API_KEY) {
+                openApiModal();
+                showToast("Lütfen önce API Şifrenizi girin!", "error");
+                return false;
+            }
+            return true;
+        }
+
         const generateId = () => Math.random().toString(36).substr(2, 9);
         let appData = { decks: [], darkMode: false };
         let activeDeckId = null;
@@ -767,6 +809,7 @@
         }
 
         window.generateCardsWithAI = async function() {
+            if(!checkApiKey()) return;
             const topic = document.getElementById('aiTopic').value.trim();
             const deck = appData.decks.find(d => d.id === activeDeckId);
             if (!topic) return showToast("Önce bir konu yaz.", "error");
@@ -777,8 +820,10 @@
 
             try {
                 const prompt = `"${topic}" konusuyla ilgili İngilizce öğrenen biri için 10 tane kelime kartı üret. Çıktı SADECE JSON dizisi olmalı, başında sonunda markdown veya açıklama OLMASIN: [{"question":"apple","answer":"elma","difficulty":"A1"}]. "question" İngilizce kelime, "answer" Türkçe karşılığı, "difficulty" A1/A2/B1/B2/C1 seviyelerinden biri olmalı.`;
-                const responseText = await callGeminiAPI(prompt);
-                let text = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+                const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=' + GEMINI_API_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+                const data = await response.json(); 
+                if(data.error) throw new Error(data.error.message);
+                let text = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
                 const newCards = JSON.parse(text);
 
                 let added = 0;
@@ -1187,14 +1232,17 @@
         }
 
         window.generateExampleSentence = async function(cardId, word, answer) {
+            if(!checkApiKey()) return;
             const btn = document.getElementById(`btn-example-${cardId}`);
             if(btn) { btn.innerHTML = 'Üretiliyor...'; btn.disabled = true; }
             try {
                 const prompt = `Sen bir İngilizce öğretmenisin. Öğrencinin "${word}" (Anlamı: ${answer}) kelimesini daha iyi anlaması için kısa, anlaşılır ve B1-B2 seviyesinde BİR TANE İngilizce örnek cümle kur. SADECE cümleyi ver.`;
                 const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=' + GEMINI_API_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
-                const data = await response.json(); let sentence = data.candidates[0].content.parts[0].text.trim();
+                const data = await response.json(); 
+                if(data.error) throw new Error(data.error.message);
+                let sentence = data.candidates[0].content.parts[0].text.trim();
                 appData.decks.forEach(d => { let c = d.cards.find(c => c.id === cardId); if(c) c.exampleSentence = sentence; }); saveData(); renderCard(); 
-            } catch (error) { showToast("Hata", "error"); if(btn) { btn.innerHTML = '🪄 Dene'; btn.disabled = false; } }
+            } catch (error) { showToast(error.message || "Hata", "error"); if(btn) { btn.innerHTML = '🪄 Cümle Getir'; btn.disabled = false; } }
         }
 
         window.customExampleSentence = function(cardId) {
@@ -1242,14 +1290,17 @@
         
         // AI CÜMLE PRATİĞİ FONKSİYONLARI...
         async function startAiPractice() {
+            if(!checkApiKey()) return;
             const did = document.getElementById('aiDeckSelect').value; const deck = appData.decks.find(d => d.id === did);
-            if (!deck || deck.cards.length < 4) return showToast("Hata, kelime yetersiz.", "error");
+            if (!deck || deck.cards.length < 4) return showToast("En az 4 kelime olmalı.", "error");
             const btn = document.getElementById('startAiBtn'); const orig = btn.innerText; btn.innerText = "Hazırlanıyor..."; btn.disabled = true;
             try {
                 const words = deck.cards.sort(() => 0.5 - Math.random()).slice(0, 10).map(c => c.question).join(', ');
                 const prompt = `Şu kelimelerle boşluk doldurma (fill-in-the-blank) testi hazırla: ${words}. Çıktı SADECE JSON formatında olmalı (başında sonunda markdown olmadan): [{"sentence": "I ate an _____ today.", "word": "apple", "translation": "Bugün bir elma yedim."}]`;
                 const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=' + GEMINI_API_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
-                const data = await response.json(); let text = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
+                const data = await response.json(); 
+                if(data.error) throw new Error(data.error.message);
+                let text = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
                 const aiQuestions = JSON.parse(text);
                 aiTestQuestions = aiQuestions.map(q => {
                     let opts = deck.cards.filter(c => c.question.toLowerCase() !== q.word.toLowerCase()).sort(()=>0.5-Math.random()).slice(0, 3).map(c=>c.question);
@@ -1306,13 +1357,16 @@
         
         function toggleChat() { const w = document.getElementById('ai-chat-widget'); if(w.classList.contains('chat-closed')) { w.classList.remove('chat-closed'); w.classList.add('chat-open'); } else { w.classList.add('chat-closed'); w.classList.remove('chat-open'); } }
         async function sendChatMessage() {
+            if(!checkApiKey()) return;
             const input = document.getElementById('chat-input'); const text = input.value.trim(); if(!text) return;
             const msgs = document.getElementById('chat-messages'); msgs.innerHTML += `<div class="bg-indigo-600 text-white p-3 rounded-lg self-end max-w-[85%]">${text}</div>`; input.value = '';
             try {
                 const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=' + GEMINI_API_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: text }] }] }) });
-                const data = await response.json(); const aiReply = data.candidates[0].content.parts[0].text;
+                const data = await response.json(); 
+                if(data.error) throw new Error(data.error.message);
+                const aiReply = data.candidates[0].content.parts[0].text;
                 msgs.innerHTML += `<div class="bg-white border p-3 rounded-lg self-start max-w-[85%]">${aiReply}</div>`;
-            } catch(e) { msgs.innerHTML += `<div class="bg-red-50 text-red-500 p-3 rounded-lg self-start text-xs border">Hata.</div>`; }
+            } catch(e) { msgs.innerHTML += `<div class="bg-red-50 text-red-500 p-3 rounded-lg self-start text-xs border">${e.message || 'Hata.'}</div>`; }
         }
 
         // INIT
