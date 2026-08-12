@@ -468,9 +468,11 @@
     </script>
 
     <script>
-        // API KEY YÖNETİMİ
-        let GEMINI_API_KEY = 'AQ.Ab8RN6La62yivXeHYeC0S8lPeNlPpqxB3yyQa8k63DUIKv8ZpQ'; 
-        localStorage.setItem('gemini_api_key', GEMINI_API_KEY);
+        // AI PROXY AYARI
+        // Gemini API key'i artık burada YOK - Cloudflare Worker üzerinde, sunucu tarafında saklanıyor.
+        // gemini-proxy-worker.js dosyasını Cloudflare Workers'a deploy ettikten sonra
+        // aşağıdaki adresi kendi worker adresinle değiştir.
+        const AI_PROXY_URL = 'https://kole.samet74-74-61.workers.dev/';
         
         const generateId = () => Math.random().toString(36).substr(2, 9);
         let appData = { decks: [], darkMode: false };
@@ -1152,7 +1154,7 @@
             if(btn) { btn.innerHTML = 'Üretiliyor...'; btn.disabled = true; }
             try {
                 const prompt = `Sen bir İngilizce öğretmenisin. Öğrencinin "${word}" (Anlamı: ${answer}) kelimesini daha iyi anlaması için kısa, anlaşılır ve B1-B2 seviyesinde BİR TANE İngilizce örnek cümle kur. SADECE cümleyi ver.`;
-                const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=' + GEMINI_API_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+                const response = await fetch(AI_PROXY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
                 const data = await response.json(); let sentence = data.candidates[0].content.parts[0].text.trim();
                 appData.decks.forEach(d => { let c = d.cards.find(c => c.id === cardId); if(c) c.exampleSentence = sentence; }); saveData(); renderCard(); 
             } catch (error) { showToast("Hata", "error"); if(btn) { btn.innerHTML = '🪄 Dene'; btn.disabled = false; } }
@@ -1209,7 +1211,7 @@
             try {
                 const words = deck.cards.sort(() => 0.5 - Math.random()).slice(0, 10).map(c => c.question).join(', ');
                 const prompt = `Şu kelimelerle boşluk doldurma (fill-in-the-blank) testi hazırla: ${words}. Çıktı SADECE JSON formatında olmalı (başında sonunda markdown olmadan): [{"sentence": "I ate an _____ today.", "word": "apple", "translation": "Bugün bir elma yedim."}]`;
-                const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=' + GEMINI_API_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+                const response = await fetch(AI_PROXY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
                 const data = await response.json(); let text = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
                 const aiQuestions = JSON.parse(text);
                 aiTestQuestions = aiQuestions.map(q => {
@@ -1296,7 +1298,7 @@
             const input = document.getElementById('chat-input'); const text = input.value.trim(); if(!text) return;
             const msgs = document.getElementById('chat-messages'); msgs.innerHTML += `<div class="bg-indigo-600 text-white p-3 rounded-lg self-end max-w-[85%]">${text}</div>`; input.value = '';
             try {
-                const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=' + GEMINI_API_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: text }] }] }) });
+                const response = await fetch(AI_PROXY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: text }] }] }) });
                 const data = await response.json(); const aiReply = data.candidates[0].content.parts[0].text;
                 msgs.innerHTML += `<div class="bg-white border p-3 rounded-lg self-start max-w-[85%]">${aiReply}</div>`;
             } catch(e) { msgs.innerHTML += `<div class="bg-red-50 text-red-500 p-3 rounded-lg self-start text-xs border">Hata.</div>`; }
