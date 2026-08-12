@@ -768,6 +768,47 @@
             if (added > 0) { showToast(`${added} eklendi.`); document.getElementById('excelInput').value = ''; saveData(); updateCardsListUI(true); loadSmartSession(); }
         }
 
+        window.generateCardsWithAI = async function() {
+            const topic = document.getElementById('aiTopic').value.trim();
+            const deck = appData.decks.find(d => d.id === activeDeckId);
+            if (!topic) return showToast("Önce bir konu yaz.", "error");
+            if (!deck) return showToast("Önce bir set seçin.", "error");
+
+            const btn = document.getElementById('aiBtn'); const origText = btn.innerHTML;
+            btn.innerHTML = 'Üretiliyor...'; btn.disabled = true;
+
+            try {
+                const prompt = `"${topic}" konusuyla ilgili İngilizce öğrenen biri için 10 tane kelime kartı üret. Çıktı SADECE JSON dizisi olmalı, başında sonunda markdown veya açıklama OLMASIN: [{"question":"apple","answer":"elma","difficulty":"A1"}]. "question" İngilizce kelime, "answer" Türkçe karşılığı, "difficulty" A1/A2/B1/B2/C1 seviyelerinden biri olmalı.`;
+                const response = await fetch(AI_PROXY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+                const data = await response.json();
+                if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+                let text = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
+                const newCards = JSON.parse(text);
+
+                let added = 0;
+                newCards.forEach(c => {
+                    const validDiff = ['A1','A2','B1','B2','C1'].includes(c.difficulty) ? c.difficulty : 'Belirsiz';
+                    if (c.question && c.answer && !deck.cards.some(existing => existing.question.toLowerCase() === String(c.question).toLowerCase())) {
+                        deck.cards.unshift({ id: generateId(), question: c.question, answer: c.answer, difficulty: validDiff, encounters: 0, starred: false, srsLevel: 0, nextReview: 0, exampleSentence: '' });
+                        added++;
+                    }
+                });
+
+                if (added > 0) {
+                    saveData(); updateCardsListUI(true); loadSmartSession();
+                    document.getElementById('aiTopic').value = '';
+                    showToast(`${added} kart üretildi!`);
+                } else {
+                    showToast("Yeni kart üretilemedi (hepsi zaten setinizde olabilir).", "error");
+                }
+            } catch (err) {
+                console.error(err);
+                showToast("Kart üretilemedi: " + err.message, "error");
+            } finally {
+                btn.innerHTML = origText; btn.disabled = false;
+            }
+        }
+
         function deleteCard(id) { appData.decks.forEach(d => { d.cards = d.cards.filter(c => c.id !== id); }); saveData(); updateCardsListUI(); loadSmartSession(); }
         function clearDeck() { const deck = appData.decks.find(d => d.id === activeDeckId); if(deck && confirm("Tümünü sil?")) { deck.cards = []; saveData(); updateCardsListUI(true); loadSmartSession(); } }
 
