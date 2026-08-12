@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI İngilizce Zeka Kartları</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: { primary: '#4f46e5', secondary: '#10b981' }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .flashcard { perspective: 1000px; cursor: pointer; }
+        .flashcard-inner {
+            position: relative; width: 100%; height: 100%; text-align: center;
+            transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1); transform-style: preserve-3d;
+        }
+        .flashcard.flipped .flashcard-inner { transform: rotateY(180deg); }
+        .flashcard-front, .flashcard-back {
+            position: absolute; width: 100%; height: 100%; backface-visibility: hidden;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 1.5rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .flashcard-back { transform: rotateY(180deg); }
+        
+        #toast-container { position: fixed; bottom: 20px; left: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+        .toast { padding: 12px 24px; border-radius: 8px; color: white; font-weight: 500; opacity: 0; transform: translateY(20px) scale(0.9); transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .toast.show { opacity: 1; transform: translateY(0) scale(1); }
+        .toast.success { background: linear-gradient(135deg, #10b981, #059669); }
+        .toast.error { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        
+        #ai-chat-widget { transition: all 0.3s ease; }
+        .chat-open { transform: translateY(0); opacity: 1; pointer-events: auto; }
+        .chat-closed { transform: translateY(20px); opacity: 0; pointer-events: none; }
+        
+        .srs-btn { transition: all 0.2s; }
+        .srs-btn:hover { transform: translateY(-2px); filter: brightness(1.1); }
+        .srs-btn:active { transform: translateY(0); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-200 transition-colors duration-300 min-h-screen pb-20">
+
+    <nav class="bg-white/80 dark:bg-slate-800/80 backdrop-blur-md sticky top-0 z-40 border-b border-slate-200 dark:border-slate-700 shadow-sm transition-colors">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-4">
+                    <button onclick="toggleDarkMode()" class="p-2 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition">
+                        <svg id="moon-icon" class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                        <svg id="sun-icon" class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    </button>
+                    <span class="text-xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">LinguaAI ✨</span>
+                </div>
+                <div class="flex space-x-1 md:space-x-2 overflow-x-auto py-2">
+                    <button onclick="switchTab('sets')" class="tab-btn active px-3 py-2 rounded-lg text-sm font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 transition-colors">Setlerim</button>
+                    <button onclick="switchTab('cards')" class="tab-btn px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors">Kartlar</button>
+                    <button onclick="switchTab('test')" class="tab-btn px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors">Test</button>
+                    <button onclick="switchTab('write')" class="tab-btn px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors">Yazma</button>
+                    <button onclick="switchTab('aiPractice')" class="tab-btn px-3 py-2 rounded-lg text-sm font-medium text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/30 transition-colors">🤖 Cümle Pratiği</button>
+                    <button onclick="switchTab('dictionary')" class="tab-btn px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors">Sözlük</button>
+                    <button onclick="switchTab('stats')" class="tab-btn px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors">İstatistik</button>
+                    <button onclick="openCloudModal()" class="tab-btn px-3 py-2 rounded-lg text-sm font-bold text-sky-600 bg-sky-50 hover:bg-sky-100 dark:text-sky-300 dark:bg-sky-900/40 dark:hover:bg-sky-800 transition-colors shadow-sm border border-sky-200 dark:border-sky-800">☁️ Bulut</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Bulut Eşitleme Modalı -->
+    <div id="cloudModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl transform transition-all">
+            <h3 class="text-2xl font-bold text-slate-800 dark:text-white mb-2 flex items-center gap-2">☁️ Bulut Eşitleme</h3>
+            <p class="text-slate-600 dark:text-slate-300 mb-6 text-sm">Cihazlar arası otomatik eşitleme için bir şifre belirleyin. Aynı şifreyi telefonunuzda da girdiğinizde verileriniz saniyeler içinde birleşecek!</p>
+            <input type="text" id="sync-code-input" placeholder="Şifre belirle (Örn: kelime123)" class="w-full px-4 py-3 border-2 border-sky-200 dark:border-sky-800 dark:bg-slate-700 dark:text-white rounded-xl mb-4 outline-none focus:border-sky-500">
+            <textarea id="custom-fb-config" placeholder='Netlify için zorunlu: Firebase Config JSON yapıştırın.' class="w-full px-4 py-2 border-2 border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl mb-4 outline-none text-xs h-20 hidden"></textarea>
+            <div class="flex justify-between items-center">
+                <span id="sync-status" class="text-xs font-bold text-slate-500">Bağlı Değil</span>
+                <div class="flex gap-2">
+                    <button onclick="document.getElementById('cloudModal').classList.add('hidden')" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 text-slate-700 font-bold rounded-xl transition">Kapat</button>
+                    <button onclick="startCloudSync()" class="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white font-bold rounded-xl transition shadow-lg">Bağlan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Sekme 1: Setlerim -->
+        <section id="sets" class="tab-content active">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                <h1 class="text-3xl font-extrabold text-slate-800 dark:text-white">Çalışma Setlerim</h1>
+                <div class="flex gap-2 w-full md:w-auto">
+                    <input type="text" id="newDeckName" placeholder="Yeni set adı" class="flex-1 px-4 py-2 border-2 border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl outline-none">
+                    <button onclick="createDeck()" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl whitespace-nowrap">+ Oluştur</button>
+                </div>
+            </div>
+            <div id="decksContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12"></div>
+            
+            <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 mt-12">
+                <h2 class="text-xl font-bold mb-4 flex items-center gap-2">💾 Veri Yedekleme</h2>
+                <p class="text-slate-500 dark:text-slate-400 mb-4 text-sm">Verilerinizi kaybetmemek için tüm setlerinizi dışa aktarabilirsiniz.</p>
+                <div class="flex flex-wrap gap-4">
+                    <button onclick="exportData()" class="px-5 py-2.5 bg-slate-800 dark:bg-slate-600 text-white rounded-xl hover:bg-slate-700 transition">↓ Yedeği İndir (JSON)</button>
+                    <label class="px-5 py-2.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 rounded-xl hover:bg-indigo-100 transition cursor-pointer">
+                        <input type="file" id="importFile" class="hidden" accept=".json" onchange="importData(event)">
+                        ↑ Yedek Yükle
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <!-- Sekme 2: Kartlar -->
+        <section id="cards" class="tab-content">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                <select id="activeDeckSelect" onchange="changeActiveDeck()" class="w-full md:w-64 px-4 py-2 bg-slate-50 dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-600 rounded-xl font-bold outline-none"></select>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="studyStarredOnly" onchange="loadSmartSession()" class="w-4 h-4 text-amber-500 rounded">
+                    <span class="text-sm font-bold text-amber-700 dark:text-amber-400">⭐ Sadece Yıldızlılar</span>
+                </label>
+            </div>
+
+            <div id="addPanels" class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+                <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                    <h3 class="font-bold text-slate-800 dark:text-white mb-4">✍️ Manuel Ekle</h3>
+                    <input type="text" id="manualQ" placeholder="İngilizce (Örn: Apple)" class="w-full px-4 py-2 border-2 border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl mb-3 outline-none">
+                    <input type="text" id="manualA" placeholder="Türkçe (Örn: Elma)" class="w-full px-4 py-2 border-2 border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl mb-3 outline-none">
+                    <button onclick="addManualCard()" class="w-full bg-slate-800 dark:bg-slate-600 text-white font-bold py-2 rounded-xl">Ekle</button>
+                </div>
+                <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                    <h3 class="font-bold text-slate-800 dark:text-white mb-4">🪄 AI ile Toplu Üret</h3>
+                    <input type="text" id="aiTopic" placeholder="Konu (Örn: Hava durumu)" class="w-full px-4 py-2 border-2 border-indigo-200 dark:border-indigo-800 dark:bg-slate-700 dark:text-white rounded-xl mb-3 outline-none">
+                    <button id="aiBtn" onclick="generateCardsWithAI()" class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold py-3 rounded-xl">✨ Üret</button>
+                </div>
+                <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                    <h3 class="font-bold text-slate-800 dark:text-white mb-4">📊 Excel'den Yapıştır</h3>
+                    <textarea id="excelInput" placeholder="Kelime [TAB] Anlamı" class="w-full px-4 py-2 border-2 border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl mb-3 h-24 text-sm"></textarea>
+                    <button onclick="importFromExcel()" class="w-full bg-emerald-500 text-white font-bold py-2 rounded-xl">İçe Aktar</button>
+                </div>
+            </div>
+
+            <!-- Kart Görüntüleme -->
+            <div class="flex flex-col items-center mb-16 relative">
+                <div class="w-full max-w-2xl flex justify-between items-center mb-4">
+                    <button onclick="loadSmartSession()" class="px-4 py-1.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-bold rounded-lg text-sm hover:bg-indigo-200">🧠 Akıllı 20'li Çek</button>
+                    <div id="counter" class="text-sm font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 px-4 py-1.5 rounded-full">0 / 0</div>
+                </div>
+                
+                <div id="flashcardContainer" class="w-full flex justify-center mb-8"></div>
+
+                <div class="flex justify-center gap-4 w-full max-w-md">
+                    <button onclick="prevCard()" class="flex-1 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold py-3 px-6 rounded-2xl">← Önceki</button>
+                    <button onclick="nextCard()" class="flex-1 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold py-3 px-6 rounded-2xl">Sonraki →</button>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div class="bg-slate-50 dark:bg-slate-700/50 px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-3">
+                    <div class="flex items-center gap-4">
+                        <h3 class="font-bold text-slate-800 dark:text-white">Bu Setteki Kelimeler (<span id="deckWordCount">0</span>)</h3>
+                        <div id="bulkTools" class="hidden flex gap-2">
+                            <button onclick="studySelected()" class="text-xs px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-sm transition">Seçilileri Çalış</button>
+                            <button onclick="createDeckFromSelected()" class="text-xs px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-sm transition">Yeni Set Yap</button>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <select id="sortSelect" onchange="updateCardsListUI(true)" class="text-sm bg-white dark:bg-slate-600 border border-slate-300 dark:border-slate-500 text-slate-700 dark:text-slate-200 rounded-lg px-2 py-1">
+                            <option value="default">Sıralama (Normal)</option>
+                            <option value="az">A'dan Z'ya</option><option value="za">Z'den A'ya</option><option value="shuffle">🔀 Karıştır</option>
+                        </select>
+                        <button onclick="clearDeck()" class="text-sm text-red-500 font-medium px-3 py-1 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 transition">Tümünü Sil</button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead><tr class="text-xs uppercase text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
+                            <th class="px-4 py-3 w-10"><input type="checkbox" id="selectAllCards" onchange="toggleAllCards(this)" class="w-4 h-4 rounded text-indigo-600 cursor-pointer"></th>
+                            <th class="px-2 py-3 w-10">⭐</th>
+                            <th class="px-6 py-3">İngilizce</th>
+                            <th class="px-6 py-3">Türkçe</th>
+                            <th class="px-6 py-3 text-right">İşlem</th>
+                        </tr></thead>
+                        <tbody id="cardList" class="divide-y divide-slate-100 dark:divide-slate-700/50"></tbody>
+                    </table>
+                </div>
+                <!-- Pagination for Cards List -->
+                <div id="cardsPagination" class="bg-white dark:bg-slate-800 p-4 flex justify-between items-center border-t border-slate-200 dark:border-slate-700"></div>
+            </div>
+        </section>
+
+        <!-- Sözlük -->
+        <section id="dictionary" class="tab-content">
+            <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-700 pb-4">
+                    <h2 class="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">📖 Sözlük</h2>
+                    <div class="flex flex-wrap gap-2 items-center w-full md:w-auto">
+                        <select id="dictDeckFilter" onchange="renderDictionary(true)" class="px-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm outline-none"><option value="all">Tüm Setler</option></select>
+                        <select id="dictFilter" onchange="renderDictionary(true)" class="px-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm outline-none">
+                            <option value="all">Tüm Seviyeler</option><option value="starred">⭐ Yıldızlılar</option>
+                            <option value="A1">A1</option><option value="A2">A2</option><option value="B1">B1</option><option value="B2">B2</option><option value="C1">C1</option><option value="Belirsiz">Belirsiz</option>
+                        </select>
+                        <button onclick="autoAssignDifficulty()" class="px-3 py-2 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-bold rounded-lg text-sm">🪄 AI Ata</button>
+                        <button onclick="exportDictionaryToPDF()" class="px-3 py-2 bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300 font-bold rounded-lg text-sm">🖨️ PDF İndir</button>
+                    </div>
+                </div>
+                
+                <div id="pdf-content">
+                    <div id="pdf-header" class="hidden mb-4 text-center">
+                        <h2 class="text-2xl font-bold text-slate-800">LinguaAI Sözlük</h2><p id="pdf-subtitle" class="text-sm text-slate-500"></p>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead><tr class="text-xs uppercase text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700"><th class="px-6 py-3 w-10 pdf-hide">⭐</th><th class="px-6 py-3">İngilizce</th><th class="px-6 py-3">Türkçe</th><th class="px-6 py-3">Set</th><th class="px-6 py-3">Seviye</th></tr></thead>
+                            <tbody id="dictList" class="divide-y divide-slate-100 dark:divide-slate-700/50"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <!-- Pagination for Dictionary -->
+                <div id="dictPagination" class="flex justify-between items-center p-4 mt-2"></div>
+            </div>
+        </section>
+
+        <!-- Test Sekmesi -->
+        <section id="test" class="tab-content">
+            <div id="testArea" class="max-w-3xl mx-auto bg-white dark:bg-slate-800 rounded-3xl p-8 shadow-sm border border-slate-100 dark:border-slate-700 text-center relative">
+                <div id="testSetup">
+                    <h2 class="text-2xl font-bold mb-6 text-slate-800 dark:text-white">Çoktan Seçmeli Test</h2>
+                    <div class="flex flex-col gap-4 max-w-sm mx-auto mb-6">
+                        <select id="testDeckSelect" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-600 rounded-xl outline-none"></select>
+                        <select id="testDirection" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-600 rounded-xl outline-none font-bold text-indigo-700 dark:text-indigo-300">
+                            <option value="en-tr">🇬🇧 İngilizce sor ➔ 🇹🇷 Türkçe bul</option>
+                            <option value="tr-en">🇹🇷 Türkçe sor ➔ 🇬🇧 İngilizce bul</option>
+                        </select>
+                        <label class="flex items-center gap-2 cursor-pointer bg-amber-50 dark:bg-amber-900/20 px-4 py-3 rounded-xl border border-amber-200 dark:border-amber-800">
+                            <input type="checkbox" id="testStarredOnly" class="w-5 h-5 text-amber-500 rounded">
+                            <span class="font-bold text-amber-700 dark:text-amber-400">⭐ Sadece Yıldızlılar</span>
+                        </label>
+                    </div>
+                    <button onclick="startTest()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-10 rounded-xl transition text-lg shadow-lg w-full max-w-sm">Testi Başlat</button>
+                    <div class="mt-6">
+                        <button onclick="showTestHistory()" class="text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 text-sm font-bold underline transition">Test Geçmişimi Gör</button>
+                    </div>
+                </div>
+                
+                <div id="testActive" class="hidden">
+                    <div class="flex justify-between items-center mb-8">
+                        <span class="text-sm font-bold text-slate-400 dark:text-slate-500">Soru: <span id="testQNum">1</span> / <span id="testTotal">10</span></span>
+                        <span class="text-sm font-bold bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 px-3 py-1 rounded-full">Skor: <span id="testScore">0</span></span>
+                    </div>
+                    <h3 id="testQuestion" class="text-4xl font-extrabold mb-10 text-slate-800 dark:text-white"></h3>
+                    <div id="testOptions" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"></div>
+                    
+                    <!-- Yeni Eklenti: Açıklama ve İleri Butonu -->
+                    <div id="testExplanationArea" class="hidden mb-6 p-5 rounded-xl text-left border"></div>
+                    <button id="testNextBtn" onclick="nextTestQuestion()" class="hidden w-full bg-slate-800 dark:bg-slate-600 hover:bg-slate-900 dark:hover:bg-slate-500 text-white font-bold py-4 rounded-xl transition text-lg shadow-md mb-6">Sonraki Soru →</button>
+                    
+                    <button onclick="endTest()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-sm font-medium underline">Testi Bitir</button>
+                </div>
+
+                <!-- Yeni Eklenti: Detaylı Analiz Ekranı -->
+                <div id="testResultScreen" class="hidden">
+                    <h2 class="text-3xl font-extrabold mb-2 text-slate-800 dark:text-white">🏆 Test Tamamlandı!</h2>
+                    <div class="text-xl mb-8 font-medium text-slate-600 dark:text-slate-300">Puan: <span id="testFinalScore" class="font-black text-indigo-600 dark:text-indigo-400 text-3xl ml-2"></span></div>
+                    
+                    <div class="text-left font-bold text-slate-700 dark:text-slate-300 mb-4">Soru Analizi:</div>
+                    <div id="testDetailedResults" class="space-y-4 mb-8 text-left max-h-[450px] overflow-y-auto pr-2"></div>
+                    
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                        <button onclick="document.getElementById('testResultScreen').classList.add('hidden'); document.getElementById('testSetup').classList.remove('hidden');" class="px-8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition text-lg shadow-lg">Yeni Test</button>
+                        <button onclick="showTestHistory()" class="px-8 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-white font-bold py-3 rounded-xl transition text-lg shadow-md">Geçmişi Gör</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Yazarak Öğrenme Sekmesi -->
+        <section id="write" class="tab-content">
+            <div id="writeArea" class="max-w-3xl mx-auto bg-white dark:bg-slate-800 rounded-3xl p-8 shadow-sm border border-slate-100 dark:border-slate-700 text-center">
+                <div id="writeSetup">
+                    <h2 class="text-2xl font-bold mb-6 text-slate-800 dark:text-white">Yazarak Öğren</h2>
+                    <div class="flex flex-col gap-4 max-w-sm mx-auto mb-6">
+                        <select id="writeDeckSelect" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-600 rounded-xl outline-none"></select>
+                        <select id="writeDirection" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-600 rounded-xl outline-none font-bold text-indigo-700 dark:text-indigo-300">
+                            <option value="tr-en">🇹🇷 Türkçe sor ➔ 🇬🇧 İngilizce yaz</option>
+                            <option value="en-tr">🇬🇧 İngilizce sor ➔ 🇹🇷 Türkçe yaz</option>
+                        </select>
+                        <label class="flex items-center gap-2 cursor-pointer bg-amber-50 dark:bg-amber-900/20 px-4 py-3 rounded-xl border border-amber-200 dark:border-amber-800">
+                            <input type="checkbox" id="writeStarredOnly" class="w-5 h-5 text-amber-500 rounded">
+                            <span class="font-bold text-amber-700 dark:text-amber-400">⭐ Sadece Yıldızlılar</span>
+                        </label>
+                    </div>
+                    <button onclick="startWrite()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-10 rounded-xl transition text-lg shadow-lg">Çalışmaya Başla</button>
+                </div>
+                <div id="writeActive" class="hidden">
+                    <div class="text-sm font-bold text-slate-400 mb-8 flex justify-between px-2"><span>Soru: <span id="writeQNum">1</span> / <span id="writeTotal">10</span></span></div>
+                    <div class="bg-slate-50 dark:bg-slate-700/50 rounded-2xl p-8 mb-8 border-2 border-slate-100 dark:border-slate-600">
+                        <h3 id="writeQuestion" class="text-3xl font-extrabold mb-2 text-slate-800 dark:text-white"></h3>
+                        <p id="writeInstruction" class="text-slate-500 dark:text-slate-400 text-sm font-medium">Karşılığını yazın</p>
+                    </div>
+                    <input type="text" id="writeInput" onkeypress="if(event.key === 'Enter') checkWrite()" class="w-full px-6 py-4 border-2 border-indigo-200 dark:border-indigo-600 dark:bg-slate-700 dark:text-white rounded-xl mb-6 text-xl text-center outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 dark:focus:ring-indigo-900 transition" autocomplete="off">
+                    <div class="flex gap-4">
+                        <button onclick="checkWrite()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl transition text-lg shadow-md">Cevapla</button>
+                        <button onclick="document.getElementById('writeInput').value=''; checkWrite()" class="px-6 bg-slate-200 dark:bg-slate-600 hover:bg-slate-300 dark:hover:bg-slate-500 text-slate-700 dark:text-slate-200 font-bold rounded-xl transition">Bilmiyorum</button>
+                    </div>
+                </div>
+                <div id="writeResult" class="hidden">
+                    <div id="writeFeedback" class="text-2xl font-bold mb-4"></div>
+                    <div class="text-lg mb-8 text-slate-600 dark:text-slate-300">Doğru Cevap: <span id="writeCorrectAns" class="font-bold text-indigo-600 dark:text-indigo-400"></span></div>
+                    <button onclick="nextWrite()" class="bg-slate-800 dark:bg-slate-600 hover:bg-slate-900 text-white font-bold py-3 px-10 rounded-xl transition text-lg shadow-md">Devam Et</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- AI Cümle Pratiği -->
+        <section id="aiPractice" class="tab-content">
+            <div id="aiTestArea" class="max-w-3xl mx-auto bg-white dark:bg-slate-800 rounded-3xl p-8 shadow-sm border border-slate-100 dark:border-slate-700 text-center">
+                <div id="aiSetup"><h2 class="text-2xl font-bold mb-2 text-slate-800 dark:text-white flex justify-center items-center gap-2">🤖 AI Cümle Pratiği</h2><div class="flex flex-col gap-4 max-w-sm mx-auto mb-6"><select id="aiDeckSelect" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-600 rounded-xl outline-none"></select></div><button id="startAiBtn" onclick="startAiPractice()" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-10 rounded-xl transition text-lg shadow-lg">Test Üret (10 Soru)</button></div>
+                <div id="aiActive" class="hidden">
+                    <div class="text-sm font-bold text-slate-400 mb-6 flex justify-between px-2"><span>Soru: <span id="aiQNum">1</span> / <span id="aiTotal">10</span></span> <span class="text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 px-3 py-1 rounded-full">Skor: <span id="aiScoreDisplay">0</span></span></div>
+                    <div class="bg-purple-50 dark:bg-purple-900/20 rounded-2xl p-8 mb-6 border border-purple-100 dark:border-purple-800">
+                        <p id="aiSentence" class="text-2xl font-medium mb-4 text-slate-800 dark:text-white leading-relaxed"></p>
+                        <p id="aiTranslation" class="text-sm text-purple-600 dark:text-purple-400 italic hidden"></p>
+                        <button id="aiHintBtn" onclick="document.getElementById('aiTranslation').classList.remove('hidden'); this.style.display='none'" class="text-xs text-purple-500 hover:underline font-medium">Türkçe İpucu Gör</button>
+                    </div>
+                    <div id="aiOptions" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"></div>
+                    <div id="aiFeedbackArea" class="hidden mb-6 p-4 rounded-xl text-left border"><div id="aiFeedbackTitle" class="font-bold text-lg mb-1"></div><div id="aiFeedbackText" class="text-sm"></div></div>
+                    <button id="aiNextBtn" onclick="nextAiQuestion()" class="hidden w-full bg-slate-800 dark:bg-slate-600 hover:bg-slate-900 dark:hover:bg-slate-500 text-white font-bold py-4 rounded-xl transition text-lg shadow-md">Sonraki Soru →</button>
+                </div>
+                <div id="aiResultScreen" class="hidden"><h2 class="text-3xl font-extrabold mb-2 text-slate-800 dark:text-white">🏆 Test Tamamlandı!</h2><div class="text-xl mb-8 font-medium text-slate-600 dark:text-slate-300">Puan: <span id="aiFinalScore" class="font-black text-purple-600 dark:text-purple-400 text-3xl ml-2"></span></div><div id="aiDetailedResults" class="space-y-4 mb-8 text-left max-h-[450px] overflow-y-auto pr-2"></div><button onclick="document.getElementById('aiResultScreen').classList.add('hidden'); document.getElementById('aiSetup').classList.remove('hidden');" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-10 rounded-xl transition text-lg shadow-lg">Yeni Test</button></div>
+            </div>
+        </section>
+
+        <!-- İstatistikler -->
+        <section id="stats" class="tab-content">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-700 pb-4">
+                <h2 class="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">📊 İstatistikler</h2>
+                <div class="flex gap-2 items-center w-full md:w-auto">
+                    <select id="statsDeckSelect" onchange="renderStats()" class="w-full md:w-64 px-4 py-2 bg-slate-50 dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-600 rounded-xl font-bold outline-none"></select>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <div class="lg:col-span-2 bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
+                    <h2 class="text-xl font-bold mb-6 text-slate-800 dark:text-white">Zorluk Dağılımı</h2>
+                    <div class="relative h-64 w-full"><canvas id="levelChart"></canvas></div>
+                </div>
+                <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col justify-center">
+                    <h2 class="text-xl font-bold mb-6 text-slate-800 dark:text-white">Özet Veriler</h2>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-slate-50 dark:bg-slate-700/50 p-6 rounded-xl text-center border border-slate-100 dark:border-slate-600">
+                            <div class="text-4xl font-extrabold text-indigo-600 dark:text-indigo-400 mb-2" id="statTotalSets">0</div>
+                            <div class="text-sm font-bold text-slate-500 dark:text-slate-400">SET</div>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-700/50 p-6 rounded-xl text-center border border-slate-100 dark:border-slate-600">
+                            <div class="text-4xl font-extrabold text-emerald-600 dark:text-emerald-400 mb-2" id="statTotalWords">0</div>
+                            <div class="text-sm font-bold text-slate-500 dark:text-slate-400">KELİME</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
+                <h2 class="text-xl font-bold mb-4 text-slate-800 dark:text-white flex items-center gap-2">🔄 En Çok Etkileşimde Bulunanlar (İlk 80)</h2>
+                <ul id="topWordsList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-[400px] overflow-y-auto pr-2"></ul>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Test Geçmişi Modalı -->
+    <div id="testHistoryModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 lg:p-8 max-w-3xl w-full mx-4 shadow-2xl transform transition-all h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">📜 Test Geçmişi</h3>
+                <button onclick="document.getElementById('testHistoryModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-3xl leading-none">&times;</button>
+            </div>
+            <div id="testHistoryList" class="flex-1 overflow-y-auto pr-2 space-y-6"></div>
+        </div>
+    </div>
+
+    <div id="ai-chat-widget" class="fixed bottom-24 right-6 w-80 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden chat-closed z-50 h-[450px]">
+        <div class="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 text-white flex justify-between items-center"><div class="font-bold flex items-center gap-2">🤖 AI Öğretmen</div><button onclick="toggleChat()" class="text-white/80 hover:text-white">✖</button></div>
+        <div id="chat-messages" class="flex-1 p-4 overflow-y-auto bg-slate-50 dark:bg-slate-900 text-sm flex flex-col gap-3"><div class="bg-white dark:bg-slate-800 border p-3 rounded-lg self-start max-w-[85%]">Merhaba! Bana gramer sorabilir veya aktif setindeki kelimelerle ilgili görevler verebilirsin.</div></div>
+        <div class="p-3 bg-white dark:bg-slate-800 border-t flex gap-2"><input type="text" id="chat-input" onkeypress="if(event.key === 'Enter') sendChatMessage()" placeholder="Bir şeyler sor..." class="flex-1 px-3 py-2 bg-slate-100 dark:bg-slate-700 dark:text-white rounded-lg outline-none text-sm"><button onclick="sendChatMessage()" class="bg-indigo-600 text-white px-3 py-2 rounded-lg font-bold">Gönder</button></div>
+    </div>
+    <button onclick="toggleChat()" class="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full shadow-xl flex items-center justify-center text-2xl z-50">🤖</button>
+
+    <div id="toast-container"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        let db, auth, unsubscribeSync = null;
+        window.isCloudSyncActive = false;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'lingua-ai-clone';
+
+        window.openCloudModal = function() {
+            document.getElementById('cloudModal').classList.remove('hidden');
+            document.getElementById('sync-code-input').value = localStorage.getItem('linguaAI_syncCode') || '';
+            if (typeof __firebase_config === 'undefined') document.getElementById('custom-fb-config').classList.remove('hidden');
+        }
+
+        window.startCloudSync = async function() {
+            const code = document.getElementById('sync-code-input').value.trim();
+            if(!code) { showToast("Lütfen bir şifre girin", "error"); return; }
+            document.getElementById('sync-status').innerText = 'Bağlanıyor...';
+            document.getElementById('sync-status').className = 'text-xs font-bold text-amber-500';
+            let configObj;
+            try {
+                if (typeof __firebase_config !== 'undefined') { configObj = JSON.parse(__firebase_config); } else {
+                    const custom = document.getElementById('custom-fb-config').value.trim();
+                    if(!custom) { document.getElementById('sync-status').innerText = 'Config Eksik'; alert("Firebase Config yapıştırmalısınız."); return; }
+                    configObj = JSON.parse(custom);
+                }
+                const app = initializeApp(configObj);
+                db = getFirestore(app); auth = getAuth(app);
+                let token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                if (token) await signInWithCustomToken(auth, token); else await signInAnonymously(auth);
+                
+                if (!auth.currentUser) throw new Error("Giriş yapılamadı");
+                localStorage.setItem('linguaAI_syncCode', code);
+                window.syncCode = code; window.isCloudSyncActive = true;
+                
+                document.getElementById('sync-status').innerText = 'Buluta Bağlı ☁️';
+                document.getElementById('sync-status').className = 'text-xs font-bold text-sky-500';
+                document.getElementById('cloudModal').classList.add('hidden');
+                showToast("Bulut Eşitleme Aktif!");
+
+                listenToCloud();
+                if(window.appData && window.appData.decks && window.appData.decks.length > 0) window.saveToCloud();
+            } catch(e) { console.error(e); document.getElementById('sync-status').innerText = 'Bağlantı Hatası'; document.getElementById('sync-status').className = 'text-xs font-bold text-red-500'; }
+        }
+
+        function listenToCloud() {
+            if (!window.isCloudSyncActive || !db) return;
+            if (unsubscribeSync) unsubscribeSync();
+            const syncDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'syncRooms', `room_${window.syncCode}`);
+            unsubscribeSync = onSnapshot(syncDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if (window.appData && data.updatedAt > (window.appData.lastUpdated || 0)) {
+                        if(typeof window.applyCloudData === 'function') window.applyCloudData(data.appData);
+                        showToast("Veriler telefondan güncellendi ☁️");
+                    }
+                }
+            }, (error) => { console.error("Sync error:", error); });
+        }
+
+        window.saveToCloud = async function() {
+            if (!window.isCloudSyncActive || !db || !window.appData) return;
+            const syncDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'syncRooms', `room_${window.syncCode}`);
+            try { await setDoc(syncDocRef, { appData: window.appData, updatedAt: window.appData.lastUpdated }); } catch(e) { console.error("Bulut kaydetme hatası", e); }
+        }
+    </script>
+
+    <script>
+        // API KEY YÖNETİMİ
+        let GEMINI_API_KEY = 'AQ.Ab8RN6K4tpDI1HliE0B4nN-Nt0U0DcsuuTSrc2GsrN0zcDWtyw'; 
+        localStorage.setItem('gemini_api_key', GEMINI_API_KEY);
+        
+        const generateId = () => Math.random().toString(36).substr(2, 9);
+        let appData = { decks: [], darkMode: false };
+        let activeDeckId = null;
+        let currentSessionDeckId = null;
+        let sessionCards = [], currentIndex = 0, flippedCardTracked = false;
+        
+        // Paginasyon State
+        let currentCardsPage = 1; let currentDictPage = 1; const ITEMS_PER_PAGE = 50; 
+        
+        // Test State
+        let testQuestions = [], testCurrentQ = 0, testScoreVal = 0, testDir = 'en-tr';
+        
+        // Yazma State
+        let writeQuestions = [], writeCurrentQ = 0, writeScoreVal = 0, writeDir = 'tr-en';
+        
+        // AI Test State
+        let aiTestQuestions = [], aiTestCurrentQ = 0;
+        let levelChartInstance = null;
+
+        function showToast(msg, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div'); toast.className = `toast ${type}`; toast.innerText = msg;
+            container.appendChild(toast); setTimeout(() => toast.classList.add('show'), 10);
+            setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
+        }
+
+        function toggleDarkMode() { appData.darkMode = !appData.darkMode; applyTheme(); saveData(); }
+        function applyTheme() {
+            if (appData.darkMode) { document.documentElement.classList.add('dark'); document.getElementById('moon-icon').classList.add('hidden'); document.getElementById('sun-icon').classList.remove('hidden'); } 
+            else { document.documentElement.classList.remove('dark'); document.getElementById('moon-icon').classList.remove('hidden'); document.getElementById('sun-icon').classList.add('hidden'); }
+            if(levelChartInstance) renderStats();
+        }
+
+        function loadData() {
+            const stored = localStorage.getItem('linguaAI_Data');
+            if (stored) { appData = JSON.parse(stored); }
+            if (!appData.lastUpdated) appData.lastUpdated = Date.now();
+            window.appData = appData;
+            applyTheme(); if(appData.decks.length > 0) { activeDeckId = appData.decks[0].id; populateDeckSelects(); } updateUI();
+        }
+        
+        function saveData() { 
+            appData.lastUpdated = Date.now();
+            window.appData = appData;
+            localStorage.setItem('linguaAI_Data', JSON.stringify(appData)); 
+            if(window.isCloudSyncActive && window.saveToCloud) window.saveToCloud();
+        }
+
+        window.applyCloudData = function(newData) {
+            appData = newData;
+            window.appData = appData;
+            localStorage.setItem('linguaAI_Data', JSON.stringify(appData));
+            updateUI();
+            if (document.getElementById('cards').classList.contains('active') && activeDeckId) { loadSmartSession(); updateCardsListUI(true); } 
+            else if (document.getElementById('dictionary').classList.contains('active')) { renderDictionary(true); } 
+            else if (document.getElementById('stats').classList.contains('active')) { renderStats(); }
+        }
+        
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData));
+            const dl = document.createElement('a'); dl.setAttribute("href", dataStr); dl.setAttribute("download", "linguaAI_yedek.json");
+            document.body.appendChild(dl); dl.click(); dl.remove();
+        }
+        function importData(event) {
+            const file = event.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if(parsed.decks) { appData = parsed; saveData(); activeDeckId = null; loadData(); showToast("Yedek yüklendi!"); switchTab('sets'); }
+                } catch (err) { showToast("Format hatalı.", "error"); }
+            }; reader.readAsText(file);
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active', 'bg-indigo-50', 'text-indigo-700', 'dark:bg-indigo-900/50', 'dark:text-indigo-300'));
+            document.getElementById(tabId).classList.add('active');
+            const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+            if(btn) btn.classList.add('active', 'bg-indigo-50', 'text-indigo-700', 'dark:bg-indigo-900/50', 'dark:text-indigo-300');
+            
+            populateDeckSelects();
+            if (tabId === 'cards' && activeDeckId) { 
+                if (sessionCards.length === 0 || currentSessionDeckId !== activeDeckId) {
+                    loadSmartSession(); 
+                } else {
+                    renderCard();
+                }
+                updateCardsListUI(false); 
+            }
+            if (tabId === 'dictionary') renderDictionary(false);
+            if (tabId === 'stats') renderStats();
+        }
+
+        function updateUI() { renderDecks(); populateDeckSelects(); }
+        function populateDeckSelects() {
+            const selects = ['activeDeckSelect', 'testDeckSelect', 'writeDeckSelect', 'dictDeckFilter', 'aiDeckSelect', 'statsDeckSelect'];
+            selects.forEach(id => {
+                const el = document.getElementById(id); if(!el) return;
+                const prevVal = el.value || activeDeckId;
+                el.innerHTML = (id === 'dictDeckFilter' || id === 'statsDeckSelect') ? '<option value="all">Tüm Setler</option>' : '';
+                appData.decks.forEach(d => { 
+                    const opt = document.createElement('option'); opt.value = d.id; opt.innerText = d.name; 
+                    if(id !== 'dictDeckFilter' && id !== 'statsDeckSelect' && d.id === prevVal) opt.selected = true; 
+                    el.appendChild(opt); 
+                });
+                if(id !== 'dictDeckFilter' && id !== 'statsDeckSelect' && el.value) activeDeckId = el.value;
+            });
+        }
+        function changeActiveDeck() { activeDeckId = document.getElementById('activeDeckSelect').value; loadSmartSession(); updateCardsListUI(true); }
+
+        function createDeck() {
+            const name = document.getElementById('newDeckName').value.trim();
+            if (name) { appData.decks.push({ id: generateId(), name: name, cards: [], created: Date.now() }); document.getElementById('newDeckName').value = ''; saveData(); updateUI(); showToast("Set oluşturuldu!"); }
+        }
+        function deleteDeck(id) { if (confirm("Emin misiniz?")) { appData.decks = appData.decks.filter(d => d.id !== id); activeDeckId = appData.decks.length > 0 ? appData.decks[0].id : null; saveData(); updateUI(); } }
+        function renderDecks() {
+            const container = document.getElementById('decksContainer'); container.innerHTML = '';
+            appData.decks.forEach(d => {
+                const cardCount = d.cards.length; const knownCount = d.cards.filter(c => c.srsLevel > 2).length; const progress = cardCount === 0 ? 0 : Math.round((knownCount / cardCount) * 100);
+                container.innerHTML += `<div class="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md cursor-pointer group relative" onclick="activeDeckId='${d.id}'; switchTab('cards');"><button onclick="event.stopPropagation(); deleteDeck('${d.id}')" class="absolute top-4 right-4 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100">✖</button><h3 class="text-xl font-bold mb-2">${d.name}</h3><p class="text-slate-500 text-sm mb-4">${cardCount} Kelime</p><div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5 mb-1"><div class="bg-indigo-500 h-2.5 rounded-full" style="width: ${progress}%"></div></div><p class="text-xs text-right text-slate-400 font-bold">%${progress} Öğrenildi</p></div>`;
+            });
+        }
+
+        function toggleStar(cardId) { appData.decks.forEach(d => { let c = d.cards.find(c => c.id === cardId); if(c) { c.starred = !c.starred; } }); saveData(); renderCard(); updateCardsListUI(); if(document.getElementById('dictionary').classList.contains('active')) renderDictionary(); }
+        function incrementEncounter(cardId) { appData.decks.forEach(d => { let c = d.cards.find(c => c.id === cardId); if(c) c.encounters = (c.encounters||0)+1; }); saveData(); }
+        
+        // AKILLI HAFIZA ALGORİTMASI (SRS)
+        window.processSRS = function(cardId, quality, triggerNextCard = false) {
+            appData.decks.forEach(d => { 
+                let c = d.cards.find(c => c.id === cardId); 
+                if(c) { 
+                    c.encounters=(c.encounters||0)+1; const now = Date.now();
+                    if(quality === 0) { c.srsLevel = 0; c.nextReview = now + 60000; } 
+                    else if (quality === 1) { c.srsLevel = 1; c.nextReview = now + 600000; } 
+                    else if (quality === 2) { c.srsLevel = Math.max(2, c.srsLevel+1); c.nextReview = now + (c.srsLevel * 43200000); } 
+                    else if (quality === 3) { c.srsLevel = Math.max(3, c.srsLevel+2); c.nextReview = now + (c.srsLevel * 86400000); }
+                    else if (quality === 4) { c.srsLevel = 99; c.nextReview = now + (365 * 86400000); } // 1 Yıl Sonraya At (Öğrenildi)
+                }
+            }); 
+            saveData(); 
+            if(triggerNextCard) {
+                showToast("Hafızaya kaydedildi!"); 
+                setTimeout(() => nextCard(), 150);
+            }
+        }
+
+        function loadSmartSession() {
+            const deck = appData.decks.find(d => d.id === activeDeckId); if(!deck) { sessionCards = []; renderCard(); return; }
+            currentSessionDeckId = activeDeckId;
+            const onlyStarred = document.getElementById('studyStarredOnly').checked;
+            let pool = deck.cards; if(onlyStarred) pool = pool.filter(c => c.starred);
+            
+            const now = Date.now();
+            let dueCards = pool.filter(c => (c.nextReview||0) <= now && (c.encounters||0) > 0);
+            let newCards = pool.filter(c => (c.encounters||0) === 0);
+            let otherCards = pool.filter(c => (c.nextReview||0) > now);
+            
+            const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+            sessionCards = shuffle([...shuffle(dueCards), ...shuffle(newCards)]).slice(0, 20);
+            if(sessionCards.length < 20) sessionCards = [...sessionCards, ...shuffle(otherCards).slice(0, 20 - sessionCards.length)];
+            
+            currentIndex = 0; renderCard();
+        }
+
+        function changeCardsPage(dir) { currentCardsPage += dir; updateCardsListUI(false); }
+        function renderCardsPaginationControls(total, totalPages) {
+            const container = document.getElementById('cardsPagination');
+            if(totalPages <= 1) { container.innerHTML = `<span class="text-sm text-slate-500">Toplam: ${total}</span>`; return; }
+            container.innerHTML = `
+                <div class="text-sm text-slate-500 font-medium">Toplam: ${total} Kelime</div>
+                <div class="flex items-center gap-3">
+                    <button onclick="changeCardsPage(-1)" class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 font-medium transition disabled:opacity-50" ${currentCardsPage===1?'disabled':''}>Önceki</button>
+                    <span class="text-sm font-bold text-slate-700 dark:text-slate-300">Sayfa ${currentCardsPage} / ${totalPages}</span>
+                    <button onclick="changeCardsPage(1)" class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 font-medium transition disabled:opacity-50" ${currentCardsPage===totalPages?'disabled':''}>Sonraki</button>
+                </div>
+            `;
+        }
+
+        function updateCardsListUI(resetPage = false) {
+            if(resetPage) currentCardsPage = 1;
+            const deck = appData.decks.find(d => d.id === activeDeckId); const list = document.getElementById('cardList');
+            if(!deck) { list.innerHTML = ''; return; }
+            document.getElementById('deckWordCount').innerText = deck.cards.length; 
+            
+            const sortType = document.getElementById('sortSelect').value;
+            let displayCards = [...deck.cards];
+            if(sortType === 'az') displayCards.sort((a,b) => a.question.localeCompare(b.question));
+            else if (sortType === 'za') displayCards.sort((a,b) => b.question.localeCompare(a.question));
+            else if (sortType === 'shuffle') displayCards.sort(() => 0.5 - Math.random());
+
+            const totalPages = Math.ceil(displayCards.length / ITEMS_PER_PAGE);
+            if(currentCardsPage > totalPages && totalPages > 0) currentCardsPage = totalPages;
+
+            const startIndex = (currentCardsPage - 1) * ITEMS_PER_PAGE;
+            const paginatedCards = displayCards.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+            let htmlArray = [];
+            paginatedCards.forEach(c => {
+                const starStr = c.starred ? 'text-yellow-400' : 'text-slate-300 dark:text-slate-600 hover:text-yellow-400';
+                htmlArray.push(`<tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition border-b border-slate-100 dark:border-slate-700/50">
+                    <td class="px-4 py-3"><input type="checkbox" class="card-cb w-4 h-4 rounded text-indigo-600 cursor-pointer" value="${c.id}" onchange="checkBulkActions()"></td>
+                    <td class="px-2 py-3"><button onclick="event.stopPropagation(); toggleStar('${c.id}')" class="text-xl ${starStr}">★</button></td>
+                    <td class="px-6 py-3 font-bold text-slate-800 dark:text-white">${c.question}</td><td class="px-6 py-3 text-slate-600 dark:text-slate-300">${c.answer}</td><td class="px-6 py-3 text-right"><button onclick="event.stopPropagation(); deleteCard('${c.id}')" class="text-red-500 font-bold px-3 py-1 bg-red-50 dark:bg-red-900/20 rounded-lg text-sm hover:bg-red-100 transition">Sil</button></td></tr>`);
+            });
+            list.innerHTML = htmlArray.join('');
+            renderCardsPaginationControls(displayCards.length, totalPages);
+            
+            // Checkbox temizliği
+            const selectAllCb = document.getElementById('selectAllCards');
+            if(selectAllCb) selectAllCb.checked = false;
+            if(window.checkBulkActions) window.checkBulkActions();
+        }
+
+        window.toggleAllCards = function(cb) {
+            document.querySelectorAll('.card-cb').forEach(el => el.checked = cb.checked);
+            checkBulkActions();
+        };
+
+        window.checkBulkActions = function() {
+            const checked = document.querySelectorAll('.card-cb:checked');
+            const tools = document.getElementById('bulkTools');
+            if(tools) tools.classList.toggle('hidden', checked.length === 0);
+        };
+
+        window.studySelected = function() {
+            const checked = Array.from(document.querySelectorAll('.card-cb:checked')).map(cb => cb.value);
+            const deck = appData.decks.find(d => d.id === activeDeckId);
+            if(!deck || checked.length === 0) return;
+            
+            sessionCards = deck.cards.filter(c => checked.includes(c.id));
+            currentIndex = 0;
+            renderCard();
+            
+            showToast(sessionCards.length + " seçili kelime çalışmaya alındı.");
+            document.getElementById('selectAllCards').checked = false;
+            document.querySelectorAll('.card-cb').forEach(cb => cb.checked = false);
+            checkBulkActions();
+            
+            // Kart alanına kaydır
+            document.getElementById('flashcardContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        };
+
+        window.createDeckFromSelected = function() {
+            const name = prompt("Yeni setin adı ne olsun?");
+            if(!name || !name.trim()) return;
+            
+            const checked = Array.from(document.querySelectorAll('.card-cb:checked')).map(cb => cb.value);
+            const deck = appData.decks.find(d => d.id === activeDeckId);
+            if(!deck || checked.length === 0) return;
+
+            const newCards = deck.cards.filter(c => checked.includes(c.id)).map(c => ({
+                ...c, 
+                id: generateId(), 
+                encounters: 0, 
+                srsLevel: 0, 
+                nextReview: 0 
+            }));
+            
+            const newDeck = { 
+                id: generateId(), 
+                name: name.trim(), 
+                cards: newCards, 
+                created: Date.now() 
+            };
+            
+            appData.decks.push(newDeck);
+            saveData(); 
+            updateUI(); 
+            
+            showToast("Yeni set oluşturuldu!");
+            document.getElementById('selectAllCards').checked = false;
+            document.querySelectorAll('.card-cb').forEach(cb => cb.checked = false);
+            checkBulkActions();
+        };
+
+        window.addManualCard = function() {
+            const q = document.getElementById('manualQ').value.trim(), a = document.getElementById('manualA').value.trim(), deck = appData.decks.find(d => d.id === activeDeckId);
+            if(q && a && deck) { deck.cards.unshift({ id: generateId(), question: q, answer: a, difficulty: 'Belirsiz', encounters: 0, starred: false, srsLevel: 0, nextReview: 0, exampleSentence: '' }); saveData(); updateCardsListUI(true); loadSmartSession(); document.getElementById('manualQ').value = ''; document.getElementById('manualA').value = ''; showToast("Eklendi!"); }
+        }
+        
+        window.importFromExcel = function() {
+            const input = document.getElementById('excelInput').value, deck = appData.decks.find(d => d.id === activeDeckId);
+            if (!input.trim() || !deck) return showToast("Hata!", "error");
+            let added = 0;
+            input.split('\n').forEach(line => {
+                const parts = line.split(/\t| {2,}/); 
+                if (parts.length >= 2 && parts[0].trim() && parts[1].trim() && !deck.cards.some(c => c.question.toLowerCase() === parts[0].trim().toLowerCase())) { 
+                    deck.cards.unshift({ id: generateId(), question: parts[0].trim(), answer: parts[1].trim(), difficulty: 'Belirsiz', encounters: 0, starred: false, srsLevel: 0, nextReview: 0, exampleSentence: '' }); added++; 
+                }
+            });
+            if (added > 0) { showToast(`${added} eklendi.`); document.getElementById('excelInput').value = ''; saveData(); updateCardsListUI(true); loadSmartSession(); }
+        }
+
+        function deleteCard(id) { appData.decks.forEach(d => { d.cards = d.cards.filter(c => c.id !== id); }); saveData(); updateCardsListUI(); loadSmartSession(); }
+        function clearDeck() { const deck = appData.decks.find(d => d.id === activeDeckId); if(deck && confirm("Tümünü sil?")) { deck.cards = []; saveData(); updateCardsListUI(true); loadSmartSession(); } }
+
+        function renderCard() {
+            const container = document.getElementById('flashcardContainer'); flippedCardTracked = false;
+            if (sessionCards.length === 0) { container.innerHTML = `<div class="w-full max-w-2xl bg-slate-50 dark:bg-slate-800 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-3xl p-12 text-center text-slate-500 font-medium">Bu oturum için kelime yok.</div>`; document.getElementById('counter').innerText = '0 / 0'; return; }
+            const card = sessionCards[currentIndex]; const starClass = card.starred ? 'text-yellow-400 fill-current' : 'text-slate-300 dark:text-slate-500 fill-none';
+            const safeQ = card.question.replace(/'/g, "\\'").replace(/"/g, '&quot;'); const safeA = card.answer.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            
+            const sentenceHTML = card.exampleSentence 
+                ? `<div class="flex flex-col items-center gap-1 w-full px-2"><p class="text-[14px] text-slate-600 dark:text-slate-300 italic font-medium leading-tight">"${card.exampleSentence}"</p>
+                   <div class="flex gap-3 mt-2">
+                     <button onclick="event.stopPropagation(); generateExampleSentence('${card.id}', '${safeQ}', '${safeA}')" class="text-[11px] font-bold text-indigo-500 hover:text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-800 transition">🪄 Tekrar Üret</button>
+                     <button onclick="event.stopPropagation(); customExampleSentence('${card.id}')" class="text-[11px] font-bold text-slate-500 hover:text-slate-600 bg-slate-100 dark:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 transition">✍️ Kendim Yaz</button>
+                   </div></div>`
+                : `<div class="flex gap-2">
+                     <button id="btn-example-${card.id}" onclick="event.stopPropagation(); generateExampleSentence('${card.id}', '${safeQ}', '${safeA}')" class="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 rounded-lg text-sm font-bold border border-indigo-200 transition hover:bg-indigo-100">🪄 Cümle Getir</button>
+                     <button onclick="event.stopPropagation(); customExampleSentence('${card.id}')" class="px-3 py-1.5 bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-sm font-bold border border-slate-200 transition hover:bg-slate-100 dark:hover:bg-slate-600">✍️ Kendim Yaz</button>
+                   </div>`;
+
+            container.innerHTML = `
+                <div class="flashcard w-full max-w-2xl h-[380px]" onclick="this.classList.toggle('flipped'); if(this.classList.contains('flipped') && !flippedCardTracked){ incrementEncounter('${card.id}'); flippedCardTracked=true; }">
+                    <div class="flashcard-inner"><div class="flashcard-front bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-700 border-2 border-slate-200 dark:border-slate-600"><svg onclick="event.stopPropagation(); toggleStar('${card.id}')" class="w-8 h-8 absolute top-5 left-6 z-10 cursor-pointer ${starClass}" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg><span class="text-4xl font-extrabold w-full px-8 text-center">${card.question}</span><div class="absolute bottom-6 text-xs text-slate-400 font-bold uppercase tracking-widest">Çevir</div></div>
+                        <div class="flashcard-back flex-col relative bg-white dark:bg-slate-800 border-2 border-indigo-200 dark:border-indigo-800"><span class="text-3xl font-bold mt-4 text-indigo-700 dark:text-indigo-400">${card.answer}</span>
+                            <div class="w-full px-4 text-center mt-3 mb-16 min-h-[70px] flex items-center justify-center flex-col">${sentenceHTML}</div>
+                            <div class="srs-box absolute bottom-5 w-full px-3 sm:px-6 flex flex-col gap-1.5" onclick="event.stopPropagation()">
+                                <div class="text-[10px] sm:text-xs text-slate-400 text-center uppercase tracking-wider mb-1">Hafıza Durumu</div>
+                                <div class="grid grid-cols-5 gap-1 sm:gap-2">
+                                    <button onclick="processSRS('${card.id}', 0, true)" class="bg-red-100 text-red-700 hover:bg-red-200 py-2 sm:py-2.5 rounded-lg text-[10px] sm:text-xs font-bold border border-red-200 transition">Bilemedim</button>
+                                    <button onclick="processSRS('${card.id}', 1, true)" class="bg-amber-100 text-amber-700 hover:bg-amber-200 py-2 sm:py-2.5 rounded-lg text-[10px] sm:text-xs font-bold border border-amber-200 transition">Zor</button>
+                                    <button onclick="processSRS('${card.id}', 2, true)" class="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 py-2 sm:py-2.5 rounded-lg text-[10px] sm:text-xs font-bold border border-emerald-200 transition">İyi</button>
+                                    <button onclick="processSRS('${card.id}', 3, true)" class="bg-blue-100 text-blue-700 hover:bg-blue-200 py-2 sm:py-2.5 rounded-lg text-[10px] sm:text-xs font-bold border border-blue-200 transition">Kolay</button>
+                                    <button onclick="processSRS('${card.id}', 4, true)" class="bg-purple-100 text-purple-700 hover:bg-purple-200 py-2 sm:py-2.5 rounded-lg text-[10px] sm:text-xs font-bold border border-purple-200 transition shadow-sm">Öğrendim</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            document.getElementById('counter').innerText = `${currentIndex + 1} / ${sessionCards.length}`;
+        }
+        window.nextCard = function() { if (sessionCards.length > 0) { currentIndex = (currentIndex + 1) % sessionCards.length; renderCard(); } }
+        window.prevCard = function() { if (sessionCards.length > 0) { currentIndex = (currentIndex - 1 + sessionCards.length) % sessionCards.length; renderCard(); } }
+
+        // --------- YENİ: TEST MODU FONKSİYONLARI ---------
+        window.startTest = function() {
+            const deckId = document.getElementById('testDeckSelect').value;
+            const deck = appData.decks.find(d => d.id === deckId);
+            if(!deck) return;
+            
+            let pool = deck.cards;
+            if(document.getElementById('testStarredOnly').checked) pool = pool.filter(c => c.starred);
+            if(pool.length < 4) return showToast("Test için seçilen sette en az 4 kelime olmalı!", "error");
+            
+            testDir = document.getElementById('testDirection').value;
+            testQuestions = [...pool].sort(()=>0.5-Math.random()).slice(0, 10);
+            testCurrentQ = 0; testScoreVal = 0;
+            
+            document.getElementById('testSetup').classList.add('hidden');
+            document.getElementById('testResultScreen').classList.add('hidden');
+            document.getElementById('testActive').classList.remove('hidden');
+            document.getElementById('testTotal').innerText = testQuestions.length;
+            loadTestQuestion();
+        };
+
+        window.loadTestQuestion = function() {
+            if(testCurrentQ >= testQuestions.length) return endTest();
+            
+            // Açıklama ve buton alanlarını gizle
+            document.getElementById('testExplanationArea').classList.add('hidden');
+            document.getElementById('testNextBtn').classList.add('hidden');
+            
+            const q = testQuestions[testCurrentQ];
+            document.getElementById('testQNum').innerText = testCurrentQ + 1;
+            document.getElementById('testScore').innerText = testScoreVal;
+            
+            const isEnTr = testDir === 'en-tr';
+            const questionText = isEnTr ? q.question : q.answer;
+            const correctAnswer = isEnTr ? q.answer : q.question;
+            
+            document.getElementById('testQuestion').innerText = questionText; 
+            
+            const deck = appData.decks.find(d => d.id === document.getElementById('testDeckSelect').value);
+            let distractors = deck.cards.filter(c => c.id !== q.id).sort(()=>0.5-Math.random()).slice(0, 3).map(c => isEnTr ? c.answer : c.question);
+            let opts = [...distractors, correctAnswer].sort(()=>0.5-Math.random());
+            
+            const optsDiv = document.getElementById('testOptions'); 
+            optsDiv.innerHTML = '';
+            
+            opts.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = "bg-slate-50 dark:bg-slate-700/50 border-2 border-slate-200 dark:border-slate-600 hover:border-indigo-500 font-bold py-4 px-6 rounded-xl w-full text-slate-700 dark:text-slate-200 transition";
+                btn.innerText = opt;
+                btn.onclick = function() { window.checkTestAnswer(opt, this, q, correctAnswer); };
+                optsDiv.appendChild(btn);
+            });
+        };
+
+        window.checkTestAnswer = function(ans, btn, q, correctAnswer) {
+            const isCorrect = (ans === correctAnswer);
+            if(isCorrect) testScoreVal += 10;
+            
+            // Detaylı analiz için kaydet
+            q.userAnswer = ans;
+            q.isCorrect = isCorrect;
+            q.correctAnswer = correctAnswer;
+            
+            // Cevabı kontrol edince, sessizce (kartı çevirmeden) hafıza algoritmasına at
+            processSRS(q.id, isCorrect ? 2 : 0, false);
+            
+            const btns = document.getElementById('testOptions').querySelectorAll('button');
+            btns.forEach(b => {
+                b.disabled = true;
+                if(b.innerText === correctAnswer) {
+                    b.classList.remove('border-slate-200', 'hover:border-indigo-500');
+                    b.classList.add('bg-emerald-100', 'border-emerald-500', 'text-emerald-800', 'dark:bg-emerald-900/40', 'dark:text-emerald-300');
+                } else if (b === btn && !isCorrect) {
+                    b.classList.remove('border-slate-200', 'hover:border-indigo-500');
+                    b.classList.add('bg-red-100', 'border-red-500', 'text-red-800', 'dark:bg-red-900/40', 'dark:text-red-300');
+                } else {
+                    b.classList.add('opacity-50');
+                }
+            });
+            
+            document.getElementById('testScore').innerText = testScoreVal;
+            
+            // Açıklama Alanını Doldur ve Göster
+            const explArea = document.getElementById('testExplanationArea');
+            explArea.classList.remove('hidden');
+            
+            let explHtml = `<div class="font-bold text-lg mb-2 ${isCorrect ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}">${isCorrect ? '🎉 Doğru Bildin!' : '❌ Yanlış Cevap'}</div>`;
+            explHtml += `<div class="text-[15px] text-slate-700 dark:text-slate-300 leading-relaxed"><strong>${q.question}</strong> kelimesinin karşılığı <strong>${q.answer}</strong>.</div>`;
+            
+            if (q.exampleSentence) {
+                explHtml += `<div class="text-[13px] text-slate-500 dark:text-slate-400 mt-3 italic border-l-2 border-slate-300 dark:border-slate-600 pl-3">"${q.exampleSentence}"</div>`;
+            }
+            
+            if (!isCorrect) {
+                explHtml += `<div class="text-sm mt-3 pt-3 border-t border-red-200 dark:border-red-900/30 text-red-600 dark:text-red-400">Senin seçimin: <span class="line-through font-semibold">${ans}</span></div>`;
+            }
+            
+            explArea.innerHTML = explHtml;
+            explArea.className = `mb-6 p-5 rounded-xl text-left border ${isCorrect ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800' : 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'}`;
+            
+            // Sonraki Soru butonunu göster (Otomatik geçiş iptal)
+            document.getElementById('testNextBtn').classList.remove('hidden');
+        };
+
+        window.nextTestQuestion = function() {
+            testCurrentQ++;
+            loadTestQuestion();
+        };
+
+        window.endTest = function() {
+            document.getElementById('testActive').classList.add('hidden');
+            document.getElementById('testResultScreen').classList.remove('hidden');
+            
+            document.getElementById('testFinalScore').innerText = testScoreVal;
+            
+            // Test detaylarını ekrana bas
+            const details = document.getElementById('testDetailedResults');
+            details.innerHTML = '';
+            testQuestions.forEach((q, idx) => {
+                details.innerHTML += `
+                <div class="p-5 rounded-xl border ${q.isCorrect ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800' : 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'}">
+                    <div class="font-bold text-sm mb-2 ${q.isCorrect ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}">Soru ${idx + 1} ${q.isCorrect ? '✓' : '✗'}</div>
+                    <div class="mb-2 text-lg font-bold text-slate-800 dark:text-white">${testDir === 'en-tr' ? q.question : q.answer}</div>
+                    <div class="text-sm text-slate-600 dark:text-slate-400 mb-1">Doğru Cevap: <strong class="text-emerald-600 dark:text-emerald-400">${q.correctAnswer}</strong></div>
+                    ${!q.isCorrect ? `<div class="text-sm font-medium text-slate-600 dark:text-slate-400">Senin Cevabın: <span class="line-through text-red-500">${q.userAnswer || 'Boş / Tamamlanmadı'}</span></div>` : ''}
+                </div>`;
+            });
+
+            // Geçmişe Kaydet
+            if(!appData.testHistory) appData.testHistory = [];
+            const deckSelect = document.getElementById('testDeckSelect');
+            const deckName = deckSelect.options[deckSelect.selectedIndex] ? deckSelect.options[deckSelect.selectedIndex].text : "Bilinmeyen Set";
+            
+            appData.testHistory.unshift({
+                id: generateId(),
+                date: Date.now(),
+                deckName: deckName,
+                score: testScoreVal,
+                total: testQuestions.length * 10,
+                direction: testDir,
+                questions: testQuestions.map(q => ({
+                    question: testDir === 'en-tr' ? q.question : q.answer,
+                    correctAnswer: q.correctAnswer,
+                    userAnswer: q.userAnswer,
+                    isCorrect: q.isCorrect
+                }))
+            });
+            
+            if(appData.testHistory.length > 50) appData.testHistory.pop(); // Son 50 testi sakla
+            saveData();
+            
+            showToast(`Test bitti! Kaydedildi.`);
+        };
+
+        window.showTestHistory = function() {
+            document.getElementById('testHistoryModal').classList.remove('hidden');
+            const list = document.getElementById('testHistoryList');
+            list.innerHTML = '';
+            
+            if(!appData.testHistory || appData.testHistory.length === 0) {
+                list.innerHTML = `
+                    <div class="text-center py-16">
+                        <div class="text-5xl mb-4">📭</div>
+                        <h3 class="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">Henüz Test Çözmedin</h3>
+                        <p class="text-slate-500 dark:text-slate-400">Çözdüğün testlerin analizleri burada listelenecek.</p>
+                    </div>`;
+                return;
+            }
+            
+            appData.testHistory.forEach(history => {
+                const dateObj = new Date(history.date);
+                const dateStr = dateObj.toLocaleDateString('tr-TR') + ' • ' + dateObj.toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'});
+                
+                let html = `
+                <div class="bg-slate-50 dark:bg-slate-700/40 p-5 rounded-2xl border border-slate-200 dark:border-slate-600">
+                    <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4 border-b border-slate-200 dark:border-slate-600 pb-4">
+                        <div>
+                            <div class="font-bold text-slate-800 dark:text-white text-lg flex items-center gap-2">
+                                📚 ${history.deckName}
+                            </div>
+                            <div class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                🕒 ${dateStr} <span class="mx-2">|</span> 🔄 Yön: ${history.direction === 'en-tr' ? 'İng ➔ Tür' : 'Tür ➔ İng'}
+                            </div>
+                        </div>
+                        <div class="text-2xl font-black bg-white dark:bg-slate-800 px-4 py-2 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 self-start sm:self-auto ${history.score >= (history.total/2) ? 'text-emerald-500' : 'text-amber-500'}">
+                            ${history.score} <span class="text-sm font-medium text-slate-400">/ ${history.total} Puan</span>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                `;
+                
+                history.questions.forEach((q, idx) => {
+                    html += `
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between text-[15px] p-3 rounded-xl border ${q.isCorrect ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-800/30 text-emerald-900 dark:text-emerald-100' : 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-800/30 text-red-900 dark:text-red-100'}">
+                        <div class="flex-1 font-semibold truncate pr-2 mb-2 sm:mb-0">
+                            <span class="opacity-50 mr-2">${idx+1}.</span> ${q.question}
+                        </div>
+                        <div class="flex-1 text-left sm:text-right text-sm">
+                            ${q.isCorrect 
+                                ? `<span class="bg-emerald-200/50 dark:bg-emerald-800/50 px-2 py-1 rounded-md font-bold">${q.correctAnswer}</span>` 
+                                : `<span class="line-through opacity-70 mr-2 text-red-600 dark:text-red-400">${q.userAnswer || 'Boş'}</span><span class="bg-emerald-200/50 dark:bg-emerald-800/50 px-2 py-1 rounded-md font-bold text-emerald-700 dark:text-emerald-300">${q.correctAnswer}</span>`}
+                        </div>
+                    </div>
+                    `;
+                });
+                
+                html += `</div></div>`;
+                list.innerHTML += html;
+            });
+        };
+
+        // --------- YENİ: YAZARAK ÖĞRENME MODU FONKSİYONLARI ---------
+        window.startWrite = function() {
+            const deckId = document.getElementById('writeDeckSelect').value;
+            const deck = appData.decks.find(d => d.id === deckId);
+            if(!deck) return;
+            
+            let pool = deck.cards;
+            if(document.getElementById('writeStarredOnly').checked) pool = pool.filter(c => c.starred);
+            if(pool.length === 0) return showToast("Çalışacak kelime yok!", "error");
+            
+            writeDir = document.getElementById('writeDirection').value;
+            writeQuestions = [...pool].sort(()=>0.5-Math.random()).slice(0, 10);
+            writeCurrentQ = 0; writeScoreVal = 0;
+            
+            document.getElementById('writeSetup').classList.add('hidden');
+            document.getElementById('writeActive').classList.remove('hidden');
+            document.getElementById('writeTotal').innerText = writeQuestions.length;
+            loadWriteQuestion();
+        };
+
+        window.loadWriteQuestion = function() {
+            if(writeCurrentQ >= writeQuestions.length) {
+                document.getElementById('writeActive').classList.add('hidden');
+                document.getElementById('writeSetup').classList.remove('hidden');
+                return showToast(`Çalışma bitti! Çok iyi gidiyorsun. 🎉`);
+            }
+            document.getElementById('writeActive').classList.remove('hidden');
+            document.getElementById('writeResult').classList.add('hidden');
+            
+            const q = writeQuestions[writeCurrentQ];
+            document.getElementById('writeQNum').innerText = writeCurrentQ + 1;
+            
+            // Yöne göre soruyu ekrana bas
+            const questionText = writeDir === 'tr-en' ? q.answer : q.question;
+            const instruction = writeDir === 'tr-en' ? "İngilizce karşılığını yazın" : "Türkçe karşılığını yazın";
+            
+            document.getElementById('writeQuestion').innerText = questionText;
+            document.getElementById('writeInstruction').innerText = instruction;
+            document.getElementById('writeInput').value = '';
+            setTimeout(() => document.getElementById('writeInput').focus(), 100);
+        };
+
+        window.checkWrite = function() {
+            const q = writeQuestions[writeCurrentQ];
+            const input = document.getElementById('writeInput').value.trim();
+            const correctAnswer = writeDir === 'tr-en' ? q.question : q.answer;
+            
+            // Eğer butona "Bilmiyorum" diye basılmışsa input boştur.
+            const isCorrect = input.toLowerCase() === correctAnswer.toLowerCase();
+            
+            // SRS Algoritmasına bağla
+            processSRS(q.id, isCorrect ? 2 : 0, false);
+            
+            document.getElementById('writeActive').classList.add('hidden');
+            document.getElementById('writeResult').classList.remove('hidden');
+            
+            const fb = document.getElementById('writeFeedback');
+            if(isCorrect) {
+                fb.innerText = "🎉 Doğru Bildin!";
+                fb.className = "text-2xl font-bold mb-4 text-emerald-600 dark:text-emerald-400";
+            } else {
+                fb.innerText = "❌ Yanlış veya Boş Bırakıldı";
+                fb.className = "text-2xl font-bold mb-4 text-red-600 dark:text-red-400";
+                if(input) fb.innerHTML += `<div class="text-sm mt-2 text-slate-500 dark:text-slate-400 font-normal">Senin cevabın: <span class="line-through">${input}</span></div>`;
+            }
+            document.getElementById('writeCorrectAns').innerText = correctAnswer;
+        };
+
+        window.nextWrite = function() {
+            writeCurrentQ++;
+            loadWriteQuestion();
+        };
+
+
+        // SÖZLÜK, PDF ve DİĞER PAGİNASYON FONKSİYONLARI...
+        function changeDictPage(dir) { currentDictPage += dir; renderDictionary(false); }
+        function renderDictPaginationControls(total, totalPages) {
+            const container = document.getElementById('dictPagination');
+            if(totalPages <= 1) { container.innerHTML = `<span class="text-sm text-slate-500">Toplam: ${total}</span>`; return; }
+            container.innerHTML = `
+                <div class="text-sm text-slate-500 font-medium">Toplam: ${total} Kelime</div>
+                <div class="flex items-center gap-3">
+                    <button onclick="changeDictPage(-1)" class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 font-medium transition disabled:opacity-50" ${currentDictPage===1?'disabled':''}>Önceki</button>
+                    <span class="text-sm font-bold text-slate-700 dark:text-slate-300">Sayfa ${currentDictPage} / ${totalPages}</span>
+                    <button onclick="changeDictPage(1)" class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 font-medium transition disabled:opacity-50" ${currentDictPage===totalPages?'disabled':''}>Sonraki</button>
+                </div>
+            `;
+        }
+
+        function renderDictionary(resetPage = false) {
+            if(resetPage) currentDictPage = 1;
+            const list = document.getElementById('dictList');
+            const deckFilter = document.getElementById('dictDeckFilter').value; const difFilter = document.getElementById('dictFilter').value;
+            let allCards = [];
+            
+            appData.decks.forEach(d => {
+                if(deckFilter === 'all' || deckFilter === d.id) {
+                    d.cards.forEach(c => { allCards.push({...c, deckName: d.name}); });
+                }
+            });
+            if (difFilter !== 'all') {
+                if (difFilter === 'starred') allCards = allCards.filter(c => c.starred);
+                else allCards = allCards.filter(c => c.difficulty === difFilter);
+            }
+            
+            document.getElementById('pdf-subtitle').innerText = `${deckFilter === 'all' ? 'Tüm Setler' : (appData.decks.find(d=>d.id===deckFilter)?.name || '')} - ${difFilter === 'all' ? 'Tüm Seviyeler' : (difFilter==='starred'?'Yıldızlılar':difFilter)}`;
+            allCards.sort((a,b) => a.question.localeCompare(b.question));
+
+            const totalPages = Math.ceil(allCards.length / ITEMS_PER_PAGE);
+            if(currentDictPage > totalPages && totalPages > 0) currentDictPage = totalPages;
+
+            const startIndex = (currentDictPage - 1) * ITEMS_PER_PAGE;
+            const paginatedCards = allCards.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+            let htmlArray = [];
+            paginatedCards.forEach(c => {
+                const starStr = c.starred ? 'text-yellow-400' : 'text-slate-300 hover:text-yellow-400';
+                htmlArray.push(`<tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition">
+                    <td class="px-6 py-3 pdf-hide"><button onclick="toggleStar('${c.id}')" class="text-xl ${starStr}">★</button></td>
+                    <td class="px-6 py-3 font-bold text-slate-800 dark:text-white">${c.question}</td><td class="px-6 py-3 text-slate-600 dark:text-slate-300">${c.answer}</td><td class="px-6 py-3 text-xs font-bold text-slate-400">${c.deckName}</td><td class="px-6 py-3"><span class="bg-indigo-50 text-indigo-700 text-xs font-bold px-2 py-1 rounded">${c.difficulty}</span></td></tr>`);
+            });
+            
+            if(allCards.length === 0) htmlArray.push(`<tr><td colspan="5" class="text-center py-8 text-slate-500">Kelime bulunamadı.</td></tr>`);
+            list.innerHTML = htmlArray.join('');
+            renderDictPaginationControls(allCards.length, totalPages);
+        }
+
+        window.generateExampleSentence = async function(cardId, word, answer) {
+            const btn = document.getElementById(`btn-example-${cardId}`);
+            if(btn) { btn.innerHTML = 'Üretiliyor...'; btn.disabled = true; }
+            try {
+                const prompt = `Sen bir İngilizce öğretmenisin. Öğrencinin "${word}" (Anlamı: ${answer}) kelimesini daha iyi anlaması için kısa, anlaşılır ve B1-B2 seviyesinde BİR TANE İngilizce örnek cümle kur. SADECE cümleyi ver.`;
+                const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=' + GEMINI_API_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+                const data = await response.json(); let sentence = data.candidates[0].content.parts[0].text.trim();
+                appData.decks.forEach(d => { let c = d.cards.find(c => c.id === cardId); if(c) c.exampleSentence = sentence; }); saveData(); renderCard(); 
+            } catch (error) { showToast("Hata", "error"); if(btn) { btn.innerHTML = '🪄 Dene'; btn.disabled = false; } }
+        }
+
+        window.customExampleSentence = function(cardId) {
+            const sentence = prompt("Kendi örnek cümlenizi yazın:");
+            if(sentence !== null && sentence.trim() !== '') {
+                appData.decks.forEach(d => { 
+                    let c = d.cards.find(c => c.id === cardId); 
+                    if(c) c.exampleSentence = sentence.trim(); 
+                }); 
+                saveData(); 
+                renderCard();
+                showToast("Özel cümle eklendi!");
+            }
+        };
+        
+        function exportDictionaryToPDF() {
+            const prevPage = currentDictPage; currentDictPage = 1;
+            const MAX_PDF_ITEMS = 500; 
+            const deckFilter = document.getElementById('dictDeckFilter').value; const difFilter = document.getElementById('dictFilter').value;
+            let allCards = [];
+            appData.decks.forEach(d => { if(deckFilter === 'all' || deckFilter === d.id) { d.cards.forEach(c => { allCards.push({...c, deckName: d.name}); }); } });
+            if (difFilter !== 'all') { if (difFilter === 'starred') allCards = allCards.filter(c => c.starred); else allCards = allCards.filter(c => c.difficulty === difFilter); }
+            allCards.sort((a,b) => a.question.localeCompare(b.question));
+
+            const listToRender = allCards.slice(0, MAX_PDF_ITEMS);
+            if(allCards.length > MAX_PDF_ITEMS) showToast("Büyük set! Sadece ilk 500 kelime PDF'e aktarılıyor.");
+
+            let htmlArray = [];
+            listToRender.forEach(c => { htmlArray.push(`<tr><td class="px-6 py-3 pdf-hide"></td><td class="px-6 py-3 font-bold text-slate-800">${c.question}</td><td class="px-6 py-3 text-slate-600">${c.answer}</td><td class="px-6 py-3 text-xs text-slate-400">${c.deckName}</td><td class="px-6 py-3 text-xs">${c.difficulty}</td></tr>`); });
+            
+            document.getElementById('dictList').innerHTML = htmlArray.join('');
+            document.getElementById('pdf-header').classList.remove('hidden');
+            document.getElementById('dictPagination').classList.add('hidden'); 
+            
+            const element = document.getElementById('pdf-content');
+            const opt = { margin: 10, filename: 'LinguaAI_Sozluk.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 1.5 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
+            
+            html2pdf().set(opt).from(element).save().then(() => {
+                document.getElementById('pdf-header').classList.add('hidden');
+                document.getElementById('dictPagination').classList.remove('hidden');
+                currentDictPage = prevPage; 
+                renderDictionary(false); 
+            });
+        }
+        
+        // AI CÜMLE PRATİĞİ FONKSİYONLARI...
+        async function startAiPractice() {
+            const did = document.getElementById('aiDeckSelect').value; const deck = appData.decks.find(d => d.id === did);
+            if (!deck || deck.cards.length < 4) return showToast("Hata, kelime yetersiz.", "error");
+            const btn = document.getElementById('startAiBtn'); const orig = btn.innerText; btn.innerText = "Hazırlanıyor..."; btn.disabled = true;
+            try {
+                const words = deck.cards.sort(() => 0.5 - Math.random()).slice(0, 10).map(c => c.question).join(', ');
+                const prompt = `Şu kelimelerle boşluk doldurma (fill-in-the-blank) testi hazırla: ${words}. Çıktı SADECE JSON formatında olmalı (başında sonunda markdown olmadan): [{"sentence": "I ate an _____ today.", "word": "apple", "translation": "Bugün bir elma yedim."}]`;
+                const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=' + GEMINI_API_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+                const data = await response.json(); let text = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
+                const aiQuestions = JSON.parse(text);
+                aiTestQuestions = aiQuestions.map(q => {
+                    let opts = deck.cards.filter(c => c.question.toLowerCase() !== q.word.toLowerCase()).sort(()=>0.5-Math.random()).slice(0, 3).map(c=>c.question);
+                    opts.push(q.word); return { ...q, options: opts.sort(()=>0.5-Math.random()), cardObj: deck.cards.find(c=>c.question.toLowerCase()===q.word.toLowerCase()) };
+                });
+                document.getElementById('aiSetup').classList.add('hidden'); document.getElementById('aiResultScreen').classList.add('hidden'); document.getElementById('aiActive').classList.remove('hidden');
+                aiTestCurrentQ = 0; window.aiTestScoreVal = 0; document.getElementById('aiTotal').innerText = aiTestQuestions.length; loadAiQuestion();
+            } catch(e) { showToast("Soru üretilemedi", "error"); } finally { btn.innerText = orig; btn.disabled = false; }
+        }
+        function loadAiQuestion() {
+            if(aiTestCurrentQ >= aiTestQuestions.length) { return endAiTest(); }
+            document.getElementById('aiFeedbackArea').classList.add('hidden'); document.getElementById('aiNextBtn').classList.add('hidden'); document.getElementById('aiScoreDisplay').innerText = window.aiTestScoreVal;
+            const q = aiTestQuestions[aiTestCurrentQ]; document.getElementById('aiQNum').innerText = aiTestCurrentQ + 1;
+            document.getElementById('aiSentence').innerHTML = q.sentence.replace('_____', '<span class="px-6 py-1 mx-1 border-b-2 border-purple-300 inline-block text-transparent">_</span>');
+            document.getElementById('aiTranslation').innerText = `İpucu: ${q.translation}`; document.getElementById('aiTranslation').classList.add('hidden'); document.getElementById('aiHintBtn').style.display = 'inline-block';
+            const optsDiv = document.getElementById('aiOptions'); optsDiv.innerHTML = '';
+            q.options.forEach(opt => { optsDiv.innerHTML += `<button onclick="checkAiAnswer('${opt.replace(/'/g,"\\'").replace(/"/g,'&quot;')}', this)" class="bg-purple-50 dark:bg-purple-900/30 border-2 border-purple-200 hover:border-purple-500 font-bold py-4 px-6 rounded-xl w-full">${opt}</button>`; });
+        }
+        window.checkAiAnswer = function(ans, btn) {
+            const q = aiTestQuestions[aiTestCurrentQ]; const isCorrect = ans.toLowerCase() === q.word.toLowerCase();
+            q.userAnswer = ans; q.isCorrect = isCorrect; if (isCorrect) window.aiTestScoreVal += 10;
+            if(q.cardObj) processSRS(q.cardObj.id, isCorrect ? 2 : 0, false);
+            document.getElementById('aiOptions').querySelectorAll('button').forEach(b => { b.disabled = true; if (b.innerText.toLowerCase() === q.word.toLowerCase()) { b.classList.add('bg-emerald-100', 'border-emerald-500', 'text-emerald-800'); } else if (b === btn && !isCorrect) { b.classList.add('bg-red-100', 'border-red-500', 'text-red-800'); } else b.classList.add('opacity-50'); });
+            document.getElementById('aiSentence').innerHTML = q.sentence.replace('_____', `<span class="px-2 py-1 font-extrabold ${isCorrect ? 'text-emerald-600' : 'text-red-600'}">${q.word}</span>`);
+            const fbArea = document.getElementById('aiFeedbackArea'); fbArea.className = `mb-6 p-5 rounded-xl text-left border ${isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`;
+            document.getElementById('aiFeedbackTitle').innerText = isCorrect ? '🎉 Harika! Doğru' : '❌ Yanlış';
+            document.getElementById('aiFeedbackText').innerHTML = `<strong>Çevirisi:</strong> ${q.translation}` + (!isCorrect ? `<div class="mt-3 text-sm p-3 bg-white/60 rounded-lg">Cevabın "<strong>${ans}</strong>", doğrusu "<strong>${q.word}</strong>".</div>` : '');
+            document.getElementById('aiNextBtn').classList.remove('hidden');
+        }
+        window.nextAiQuestion = function() { aiTestCurrentQ++; loadAiQuestion(); }
+        window.endAiTest = function() {
+            document.getElementById('aiActive').classList.add('hidden'); document.getElementById('aiResultScreen').classList.remove('hidden'); document.getElementById('aiFinalScore').innerText = `${window.aiTestScoreVal}`;
+            const details = document.getElementById('aiDetailedResults'); details.innerHTML = '';
+            aiTestQuestions.forEach((q, idx) => { details.innerHTML += `<div class="p-5 rounded-xl border ${q.isCorrect ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}"><div class="font-bold text-sm mb-2">Soru ${idx + 1}</div><div class="mb-3 text-lg font-medium">${q.sentence.replace('_____', `<span class="underline">${q.word}</span>`)}</div><div class="text-sm"><strong>Çeviri:</strong> ${q.translation}</div>${!q.isCorrect ? `<div class="mt-3 text-sm font-medium"><span class="line-through">${q.userAnswer}</span> ➡️ <span class="text-emerald-700">${q.word}</span></div>` : ''}</div>`; });
+        }
+
+        // İSTATİSTİKLER (KAPSAMLI GÜNCELLEME)
+        function renderStats() {
+            const statsDeckId = document.getElementById('statsDeckSelect').value;
+            let totalCards = 0, diffCounts = { 'A1':0, 'A2':0, 'B1':0, 'B2':0, 'C1':0, 'Belirsiz':0 }; 
+            let allCardsFlat = [];
+            let totalSets = 0;
+            
+            appData.decks.forEach(d => { 
+                if (statsDeckId === 'all' || statsDeckId === d.id) {
+                    totalSets++;
+                    totalCards += d.cards.length; 
+                    d.cards.forEach(c => { 
+                        const lvl = c.difficulty || 'Belirsiz'; 
+                        if(diffCounts[lvl] !== undefined) diffCounts[lvl]++; else diffCounts['Belirsiz']++; 
+                        allCardsFlat.push(c); 
+                    }); 
+                }
+            });
+            
+            document.getElementById('statTotalSets').innerText = totalSets; 
+            document.getElementById('statTotalWords').innerText = totalCards;
+            
+            // En çok etkileşimde bulunulan 80 kelime (azalarak sıralı)
+            allCardsFlat.sort((a,b) => (b.encounters || 0) - (a.encounters || 0));
+            const topList = document.getElementById('topWordsList'); topList.innerHTML = '';
+            
+            const top80 = allCardsFlat.slice(0, 80).filter(c => c.encounters > 0);
+            if (top80.length > 0) {
+                top80.forEach(c => { 
+                    topList.innerHTML += `<li class="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-600"><div class="font-bold text-slate-700 dark:text-slate-200 truncate pr-3" title="${c.question}">${c.question}</div><div class="bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-bold px-3 py-1 rounded-full text-xs shrink-0">${c.encounters}x</div></li>`; 
+                });
+            } else {
+                topList.innerHTML = `<div class="col-span-full text-slate-500 dark:text-slate-400 py-4 text-center">Henüz etkileşime girilmiş kelime yok. Test çözerek veya kart çalışarak burayı doldurabilirsiniz!</div>`;
+            }
+            
+            if(levelChartInstance) levelChartInstance.destroy();
+            const ctx = document.getElementById('levelChart').getContext('2d');
+            levelChartInstance = new Chart(ctx, { 
+                type: 'bar', 
+                data: { labels: ['A1', 'A2', 'B1', 'B2', 'C1', 'Belirsiz'], datasets: [{ label: 'Kelime', data: [diffCounts.A1, diffCounts.A2, diffCounts.B1, diffCounts.B2, diffCounts.C1, diffCounts.Belirsiz], backgroundColor: '#6366f1', borderRadius: 4 }] }, 
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } 
+            });
+        }
+        
+        function toggleChat() { const w = document.getElementById('ai-chat-widget'); if(w.classList.contains('chat-closed')) { w.classList.remove('chat-closed'); w.classList.add('chat-open'); } else { w.classList.add('chat-closed'); w.classList.remove('chat-open'); } }
+        async function sendChatMessage() {
+            const input = document.getElementById('chat-input'); const text = input.value.trim(); if(!text) return;
+            const msgs = document.getElementById('chat-messages'); msgs.innerHTML += `<div class="bg-indigo-600 text-white p-3 rounded-lg self-end max-w-[85%]">${text}</div>`; input.value = '';
+            try {
+                const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=' + GEMINI_API_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: text }] }] }) });
+                const data = await response.json(); const aiReply = data.candidates[0].content.parts[0].text;
+                msgs.innerHTML += `<div class="bg-white border p-3 rounded-lg self-start max-w-[85%]">${aiReply}</div>`;
+            } catch(e) { msgs.innerHTML += `<div class="bg-red-50 text-red-500 p-3 rounded-lg self-start text-xs border">Hata.</div>`; }
+        }
+
+        // INIT
+        window.onload = () => { loadData(); if(appData.darkMode) applyTheme(); };
+    </script>
+</body>
+</html>
