@@ -473,6 +473,38 @@
         // gemini-proxy-worker.js dosyasını Cloudflare Workers'a deploy ettikten sonra
         // aşağıdaki adresi kendi worker adresinle değiştir.
         const AI_PROXY_URL = 'https://kole.samet74-74-61.workers.dev/';
+
+        // Ortak Gemini API çağrısı fonksiyonu.
+        // Kota/rate-limit hatası alınırsa 5 saniye bekleyip 1 kere daha otomatik dener.
+        async function callGeminiAPI(promptText) {
+            for (let attempt = 0; attempt < 2; attempt++) {
+                let response, data;
+                try {
+                    response = await fetch(AI_PROXY_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+                    });
+                    data = await response.json();
+                } catch (netErr) {
+                    throw new Error('Sunucuya ulaşılamadı. İnternet bağlantını kontrol et.');
+                }
+
+                if (data.error) {
+                    const errMsg = data.error.message || JSON.stringify(data.error);
+                    const isQuota = /quota|rate limit/i.test(errMsg) || data.error.code === 429;
+                    if (isQuota && attempt === 0) {
+                        await new Promise(r => setTimeout(r, 5000));
+                        continue; // bir kere daha dene
+                    }
+                    if (isQuota) throw new Error('Çok hızlı istek gönderildi, birkaç saniye bekleyip tekrar dene.');
+                    throw new Error(errMsg);
+                }
+
+                if (!data.candidates || !data.candidates[0]) throw new Error('AI yanıt vermedi, tekrar dene.');
+                return data.candidates[0].content.parts[0].text;
+            }
+        }
         
         const generateId = () => Math.random().toString(36).substr(2, 9);
         let appData = { decks: [], darkMode: false };
@@ -779,10 +811,8 @@
 
             try {
                 const prompt = `"${topic}" konusuyla ilgili İngilizce öğrenen biri için 10 tane kelime kartı üret. Çıktı SADECE JSON dizisi olmalı, başında sonunda markdown veya açıklama OLMASIN: [{"question":"apple","answer":"elma","difficulty":"A1"}]. "question" İngilizce kelime, "answer" Türkçe karşılığı, "difficulty" A1/A2/B1/B2/C1 seviyelerinden biri olmalı.`;
-                const response = await fetch(AI_PROXY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
-                const data = await response.json();
-                if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-                let text = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
+                const response = await callGeminiAPI(prompt);
+                let text = response.replace(/```json/g, '').replace(/```/g, '').trim();
                 const newCards = JSON.parse(text);
 
                 let added = 0;
@@ -1195,10 +1225,9 @@
             if(btn) { btn.innerHTML = 'Üretiliyor...'; btn.disabled = true; }
             try {
                 const prompt = `Sen bir İngilizce öğretmenisin. Öğrencinin "${word}" (Anlamı: ${answer}) kelimesini daha iyi anlaması için kısa, anlaşılır ve B1-B2 seviyesinde BİR TANE İngilizce örnek cümle kur. SADECE cümleyi ver.`;
-                const response = await fetch(AI_PROXY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
-                const data = await response.json(); let sentence = data.candidates[0].content.parts[0].text.trim();
+                const sentence = (await callGeminiAPI(prompt)).trim();
                 appData.decks.forEach(d => { let c = d.cards.find(c => c.id === cardId); if(c) c.exampleSentence = sentence; }); saveData(); renderCard(); 
-            } catch (error) { showToast("Hata", "error"); if(btn) { btn.innerHTML = '🪄 Dene'; btn.disabled = false; } }
+            } catch (error) { showToast(error.message || "Hata", "error"); if(btn) { btn.innerHTML = '🪄 Dene'; btn.disabled = false; } }
         }
 
         window.customExampleSentence = function(cardId) {
@@ -1252,8 +1281,8 @@
             try {
                 const words = deck.cards.sort(() => 0.5 - Math.random()).slice(0, 10).map(c => c.question).join(', ');
                 const prompt = `Şu kelimelerle boşluk doldurma (fill-in-the-blank) testi hazırla: ${words}. Çıktı SADECE JSON formatında olmalı (başında sonunda markdown olmadan): [{"sentence": "I ate an _____ today.", "word": "apple", "translation": "Bugün bir elma yedim."}]`;
-                const response = await fetch(AI_PROXY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
-                const data = await response.json(); let text = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
+                const response = await callGeminiAPI(prompt);
+                let text = response.replace(/```json/g, '').replace(/```/g, '').trim();
                 const aiQuestions = JSON.parse(text);
                 aiTestQuestions = aiQuestions.map(q => {
                     let opts = deck.cards.filter(c => c.question.toLowerCase() !== q.word.toLowerCase()).sort(()=>0.5-Math.random()).slice(0, 3).map(c=>c.question);
@@ -1261,7 +1290,7 @@
                 });
                 document.getElementById('aiSetup').classList.add('hidden'); document.getElementById('aiResultScreen').classList.add('hidden'); document.getElementById('aiActive').classList.remove('hidden');
                 aiTestCurrentQ = 0; window.aiTestScoreVal = 0; document.getElementById('aiTotal').innerText = aiTestQuestions.length; loadAiQuestion();
-            } catch(e) { showToast("Soru üretilemedi", "error"); } finally { btn.innerText = orig; btn.disabled = false; }
+            } catch(e) { showToast(e.message || "Soru üretilemedi", "error"); } finally { btn.innerText = orig; btn.disabled = false; }
         }
         function loadAiQuestion() {
             if(aiTestCurrentQ >= aiTestQuestions.length) { return endAiTest(); }
@@ -1339,10 +1368,9 @@
             const input = document.getElementById('chat-input'); const text = input.value.trim(); if(!text) return;
             const msgs = document.getElementById('chat-messages'); msgs.innerHTML += `<div class="bg-indigo-600 text-white p-3 rounded-lg self-end max-w-[85%]">${text}</div>`; input.value = '';
             try {
-                const response = await fetch(AI_PROXY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: text }] }] }) });
-                const data = await response.json(); const aiReply = data.candidates[0].content.parts[0].text;
+                const aiReply = await callGeminiAPI(text);
                 msgs.innerHTML += `<div class="bg-white border p-3 rounded-lg self-start max-w-[85%]">${aiReply}</div>`;
-            } catch(e) { msgs.innerHTML += `<div class="bg-red-50 text-red-500 p-3 rounded-lg self-start text-xs border">Hata.</div>`; }
+            } catch(e) { msgs.innerHTML += `<div class="bg-red-50 text-red-500 p-3 rounded-lg self-start text-xs border">${e.message || 'Hata.'}</div>`; }
         }
 
         // INIT
